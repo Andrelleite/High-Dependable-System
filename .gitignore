@@ -1,3 +1,7 @@
 
 *.class
 out/production/High-Dependable-System/grid/grid1.txt
+.idea/uiDesigner.xml
+ClientReports.txt
+*.xml
+.idea/uiDesigner.xml

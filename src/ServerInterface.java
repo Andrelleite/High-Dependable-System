@@ -19,6 +19,6 @@ public interface ServerInterface extends Remote, Serializable {
 
     public void subscribe(ClientInterface c, String user) throws RemoteException;
     public String echo(String message) throws RemoteException;
-    public void submitLocationReport(ClientInterface c,String user, int epoch, int x, int y) throws RemoteException;
-    public List<Reports> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException;
+    public void submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException;
+    public List<Report> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException;
 }
