@@ -6,6 +6,7 @@ import java.io.*;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.rmi.server.*;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
@@ -19,14 +20,14 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private static final long serialVersionUID = 1L;
     private ArrayList<ClientInterface> clients;
-    private ArrayList<Reports> reps;
+    private ArrayList<Report> reps;
     private boolean imPrimary;
     private String IPV4;
     private int portRMI;
 
     //=======================CONNECTION=================================================================================
 
-    private Server(int port) throws IOException, NotBoundException {
+    public Server() throws IOException, NotBoundException {
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
         this.clients = new ArrayList<>();
@@ -187,10 +188,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================USER-METHODS===============================================================================
 
-    public void submitLocationReport(ClientInterface c,String user, int epoch, int x, int y) throws RemoteException{
+    public void submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException{
         System.out.println("RECEIVED A NEW PROOF OF LOCATION FROM - "+user);
-        Reports newReport = new Reports(c,x,y,epoch,user);
-        this.reps.add(newReport);
+        System.out.println("POS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
+        System.out.println("WITNESS: " + locationReport.getWitness());
+        System.out.println("WITNESS SIGNATURE: " + locationReport.getWitnessSignature() );
+        //Report newReport = new Report(c,x,y,epoch,user);
+        this.reps.add(locationReport);
         try {
             updateReports();
         } catch (IOException e) {
@@ -199,7 +203,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
     }
 
-    public List<Reports> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
+    public List<Report> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
 
         return fetchReports(c,epoch);
 
@@ -210,22 +214,20 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private void updateReports() throws IOException {
 
         File file=new File("ClientReports.txt");
-        ObjectOutputStream oos= new ObjectOutputStream(
-                                new FileOutputStream(file));
+        ObjectOutputStream oos= new ObjectOutputStream(new FileOutputStream(file));
         oos.writeObject(this.reps);
         oos.close();
     }
 
-    private List<Reports> fetchReports(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
+    private List<Report> fetchReports(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
 
-        String user = c.getUserId();
+        //String user = c.getUserId();
         File file=new File("ClientReports.txt");
-        ObjectInputStream ois = new ObjectInputStream(
-                                new FileInputStream(file));
-        ArrayList<Reports> clientReports = (ArrayList<Reports>) ois.readObject();
+        ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file));
+        ArrayList<Report> clientReports = (ArrayList<Report>) ois.readObject();
         System.out.println("fetching size: "+clientReports.size());
         for(int i = 0; i < clientReports.size();i++){
-            if(!clientReports.get(i).getC().equals(c)){
+            if(!clientReports.get(i).getUsername().equals(c.getUsername())){
                 clientReports.remove(i);
                 i--;
             }else if(clientReports.get(i).getEpoch() != epoch){
@@ -241,7 +243,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public static void main(String args[]) {
         try {
-            Server server = new Server(7000);
+            Server server = new Server();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (NotBoundException e) {
