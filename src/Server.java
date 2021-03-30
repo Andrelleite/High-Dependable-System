@@ -206,7 +206,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     }
 
     public List<Report> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
-
+        //verificar se a assinatura é falsa
         return fetchReports(c,epoch);
 
     }

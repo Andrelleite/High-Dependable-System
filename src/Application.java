@@ -9,10 +9,13 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.*;
 
+import static java.rmi.Naming.*;
+
 public class Application {
     public static void main(String[] args) {
         int epoch = 0;
         List<Client> clientsList = new ArrayList<>();
+        List<String> clientsWithError = new ArrayList<>();
         Map<String, Integer> initClients = new HashMap<String, Integer>();
         try {
             LocateRegistry.createRegistry(7001);
@@ -53,7 +56,7 @@ public class Application {
                             Client client = new Client();
 
                             String url = "rmi://127.0.0.1:7001/" + key;
-                            Naming.rebind(url, client);
+                            rebind(url, client);
                             client.setUsername(key);
                             client.loadMoves();
                             clientsList.add(client);
@@ -65,9 +68,27 @@ public class Application {
                 });
             }
             System.out.println("\nEpoch : " + epoch + "\n");
-            for ( Client client : clientsList ) {
-                client.setEpoch(epoch);
+            Iterator<Client> itr = clientsList.iterator();
+            while (itr.hasNext()) {
+                Client client = itr.next();
+                if (client.getHasError() == 1) {
+                    itr.remove();
+                    clientsWithError.add(client.getUsername());
+                    try {
+                        unbind("rmi://127.0.0.1:7001/" + client.getUsername());
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    } catch (NotBoundException e) {
+                        e.printStackTrace();
+                    } catch (MalformedURLException e) {
+                        e.printStackTrace();
+                    }
+                }else{
+                    client.setClientsWithError(clientsWithError);
+                    client.setEpoch(epoch);
+                }
             }
+
             try {
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
