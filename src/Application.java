@@ -16,7 +16,12 @@ public class Application {
         Map<String, Integer> initClients = new HashMap<String, Integer>();
         try {
             LocateRegistry.createRegistry(7001);
+            Server s1 = new Server();
         } catch (RemoteException e) {
+            e.printStackTrace();
+        } catch (NotBoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
         try {
@@ -59,7 +64,7 @@ public class Application {
                     }
                 });
             }
-            System.out.println("Epoch : " + epoch);
+            System.out.println("\nEpoch : " + epoch + "\n");
             for ( Client client : clientsList ) {
                 client.setEpoch(epoch);
             }

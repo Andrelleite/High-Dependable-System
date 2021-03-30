@@ -1,11 +1,9 @@
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.lang.reflect.Array;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 
 class Pair<A, B> {
     A first = null;
@@ -171,7 +169,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
         return null;
     }
 
-    public String findUser() {
+    public ArrayList<String> findUser() {
+        ArrayList<String> usersNearby = new ArrayList<>();
         try {
             File myObj = new File("src/grid/grid1.txt");
             Scanner reader = new Scanner(myObj);
@@ -191,8 +190,13 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                     double distaceCalc = Math.sqrt((Math.pow((x1-x2),2) + Math.pow((y1-y2),2)));
                     int distance = (int) distaceCalc;
 
-                    if(distance <= 15 && !username.equals(this.getUsername())){ //aqui o "user1" e o "0" depois são substituidos pelos atributos do cliente
-                        return username;
+                    if(distance <= 15 && !username.equals(this.getUsername())){
+                        System.out.println("-> " + this.getUsername() + " adiciona "  + username);
+                        usersNearby.add(username);
+                    }
+
+                    if (usersNearby.size() == 5){
+                        return usersNearby;
                     }
                 }
 
@@ -204,32 +208,41 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
 
         }
 
-        return "none";
+        return usersNearby;
     }
 
     public void requestLocationProof(){
 
-        String userToContact = findUser();
+        ArrayList<String> usersToContact = findUser();
 
-        System.out.println(this.username + " trying to contact " + userToContact);
-        if(!userToContact.equals("none")){
-            try {
-                ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + userToContact);
-                Report message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.epoch);
-                if(message == null){
-                    return;
+        if(usersToContact.size() != 0){
+            Iterator i = usersToContact.iterator();
+            while (i.hasNext()) {
+                String userToContact = (String) i.next();
+                System.out.println(this.username + " trying to contact " + userToContact);
+                try {
+                    ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + userToContact);
+                    Report message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.epoch);
+                    if(message == null){
+                        return;
+                    }
+                    message.setPosX(this.getCoordinate1());
+                    message.setPosY(this.getCoordinate2());
+
+                    ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                    s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
+
+                } catch (Exception e) {
+                    System.out.println("Exception in main: " + e);
+                    e.printStackTrace();
                 }
-                message.setPosX(this.getCoordinate1());
-                message.setPosY(this.getCoordinate2());
-
-                ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-                s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
-
-            } catch (Exception e) {
-                System.out.println("Exception in main: " + e);
-                e.printStackTrace();
             }
         }
+        else{
+            System.out.println(this.getUsername() + " não tem users perto.");
+        }
+
+
 
     }
 

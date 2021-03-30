@@ -189,11 +189,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     //=======================USER-METHODS===============================================================================
 
     public void submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException{
+        System.out.println("===============================================================================================");
         System.out.println("RECEIVED A NEW PROOF OF LOCATION FROM - "+user);
         System.out.println("POS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
         System.out.println("WITNESS: " + locationReport.getWitness());
         System.out.println("WITNESS SIGNATURE: " + locationReport.getWitnessSignature() );
-        //Report newReport = new Report(c,x,y,epoch,user);
+        System.out.println("===============================================================================================");
+
         this.reps.add(locationReport);
         try {
             updateReports();
