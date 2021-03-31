@@ -4,8 +4,7 @@
  * and open the template in the editor.
  */
 
-import java.io.IOException;
-import java.io.Serializable;
+import java.io.*;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
@@ -21,4 +20,7 @@ public interface ServerInterface extends Remote, Serializable {
     public String echo(String message) throws RemoteException;
     public void submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException;
     public List<Report> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException;
+    public List<Report> obtainLocationReport(String user, int epoch) throws IOException, ClassNotFoundException;
+    public List<Report> obtainUsersAtLocation(int[] pos, int epoch) throws IOException, ClassNotFoundException;
+
 }

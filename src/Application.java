@@ -20,11 +20,9 @@ public class Application {
         try {
             LocateRegistry.createRegistry(7001);
             Server s1 = new Server();
-        } catch (RemoteException e) {
+        } catch (NotBoundException | IOException e) {
             e.printStackTrace();
-        } catch (NotBoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
         try {

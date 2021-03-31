@@ -280,8 +280,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
     public static void main(String[] args) {
 
         try {
-
-
         } catch (Exception e) {
             System.out.println("Exception in main: " + e);
             e.printStackTrace();
