@@ -27,11 +27,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================CONNECTION=================================================================================
 
-    public Server() throws IOException, NotBoundException {
+    public Server() throws IOException, NotBoundException, ClassNotFoundException {
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
         this.clients = new ArrayList<>();
-        this.reps = new ArrayList<>();
+        synchronize(); // Updates the reports in list to the latest in file
         ServerInterface server = retryConnection(7000);
         if (!imPrimary) {
             checkPrimaryServer(server);
@@ -189,11 +189,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     //=======================USER-METHODS===============================================================================
 
     public void submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException{
+        System.out.println("===============================================================================================");
         System.out.println("RECEIVED A NEW PROOF OF LOCATION FROM - "+user);
         System.out.println("POS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
         System.out.println("WITNESS: " + locationReport.getWitness());
         System.out.println("WITNESS SIGNATURE: " + locationReport.getWitnessSignature() );
-        //Report newReport = new Report(c,x,y,epoch,user);
+        System.out.println("===============================================================================================");
+
         this.reps.add(locationReport);
         try {
             updateReports();
@@ -203,31 +205,23 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
     }
 
-    public List<Report> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
-
+    public ArrayList<Report> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
+        //verificar se a assinatura é falsa
         return fetchReports(c,epoch);
 
     }
 
-    //=======================USER-METHODS===============================================================================
 
-    private void updateReports() throws IOException {
+    //=======================AUTHORITY-METHODS==========================================================================
 
-        File file=new File("ClientReports.txt");
-        ObjectOutputStream oos= new ObjectOutputStream(new FileOutputStream(file));
-        oos.writeObject(this.reps);
-        oos.close();
-    }
+    public ArrayList<Report> obtainLocationReport(String user, int epoch){
 
-    private List<Report> fetchReports(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
-
-        //String user = c.getUserId();
-        File file=new File("ClientReports.txt");
-        ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file));
-        ArrayList<Report> clientReports = (ArrayList<Report>) ois.readObject();
-        System.out.println("fetching size: "+clientReports.size());
+        System.out.println("_______________________________________________________________________");
+        System.out.println("LOCATION REPORTS REGARDING "+user+" REQUEST BY HA");
+        System.out.println("BIG BROTHER IS REQUESTING");
+        ArrayList<Report> clientReports = (ArrayList<Report>) this.reps.clone();
         for(int i = 0; i < clientReports.size();i++){
-            if(!clientReports.get(i).getUsername().equals(c.getUsername())){
+            if(!clientReports.get(i).getUsername().toUpperCase().equals(user.toUpperCase())){
                 clientReports.remove(i);
                 i--;
             }else if(clientReports.get(i).getEpoch() != epoch){
@@ -235,7 +229,97 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 i--;
             }
         }
-        ois.close();
+        System.out.println("REQUEST SIZE "+clientReports.size());
+        System.out.println("REQUEST COMPLETE");
+        return clientReports;
+
+    }
+
+    public ArrayList<Report> obtainUsersAtLocation(int[] pos, int epoch){
+
+        System.out.println("_______________________________________________________________________");
+        System.out.println("ALL LOCATION REPORTS FOR POSITION ("+pos[0]+","+pos[1]+") AT EPOCH "+epoch+" REQUEST BY HA");
+        System.out.println("BIG BROTHER IS REQUESTING");
+        ArrayList<Report> clientReports = (ArrayList<Report>) this.reps.clone();
+        for(int i = 0; i < clientReports.size();i++){
+            if(clientReports.get(i).getPosY() != pos[1]){
+                if(clientReports.get(i).getPosX() != pos[0]) {
+                    clientReports.remove(i);
+                    i--;
+                }
+            }else if(clientReports.get(i).getEpoch() != epoch){
+                clientReports.remove(i);
+                i--;
+            }
+        }
+        cleanRepetition(clientReports,0);
+        System.out.println("REQUEST SIZE "+clientReports.size());
+        System.out.println("REQUEST COMPLETE");
+        return clientReports;
+    }
+
+    //=======================DATA-FILES-METHODS=========================================================================
+
+    private void cleanRepetition(ArrayList<Report> list,int op){
+
+        if(op == 0){ // operation 0 for removal of user repetition
+            for (int i = 0; i < list.size(); i++) {
+                for(int j = i+1; j < list.size(); j++){
+                    if(list.get(i).getUsername().equals(list.get(j).getUsername())){
+                        list.remove(j);
+                        j--;
+                    }
+                }
+            }
+        }
+
+    }
+
+    private void synchronize() throws IOException, ClassNotFoundException {
+
+        File file=new File("ClientReports.txt");
+        if (file.length() == 0){
+            this.reps = new ArrayList<>();
+            System.out.println("Array is empty. Next update will make it usable.");
+        }
+        else{
+            ObjectInputStream ois = new ObjectInputStream(
+                                    new FileInputStream(file));
+            this.reps = (ArrayList<Report>) ois.readObject();
+            System.out.println("LOAD SUCCESSFUL");
+            System.out.println("SIZE OF LOAD "+this.reps.size());
+            for (Report entry : this.reps) {
+                System.out.println(entry.getUsername() +" ("+entry.getPosX()+","+entry.getPosY()+") "+entry.getEpoch());
+            }
+            ois.close();
+        }
+
+    }
+
+    private void updateReports() throws IOException {
+
+        File file=new File("ClientReports.txt");
+        ObjectOutputStream oos= new ObjectOutputStream(
+                                new FileOutputStream(file));
+        oos.writeObject(this.reps);
+        System.out.println("FILE UPDATED. NEW SIZE "+this.reps.size());
+        oos.close();
+    }
+
+    private ArrayList<Report> fetchReports(ClientInterface c, int epoch){
+
+        //String user = c.getUserId();
+        ArrayList<Report> clientReports = (ArrayList<Report>) this.reps.clone();
+        System.out.println("fetching size: "+clientReports.size());
+        for(int i = 0; i < clientReports.size();i++){
+            if(!clientReports.get(i).getC().equals(c)){
+                clientReports.remove(i);
+                i--;
+            }else if(clientReports.get(i).getEpoch() != epoch){
+                clientReports.remove(i);
+                i--;
+            }
+        }
         return clientReports;
     }
 
@@ -244,7 +328,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     public static void main(String args[]) {
         try {
             Server server = new Server();
-        } catch (IOException e) {
+        } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         } catch (NotBoundException e) {
             System.out.println("?RETRYING CONNECTION?");
