@@ -44,9 +44,12 @@ public class ClientTest extends UnicastRemoteObject implements ClientInterface {
 
         try {
             try{
-                Report n = new Report(this,10,20,2,"user5","user2","bllalalalla");
+                String user = "user4";
+                String witness = "user3";
+                Report n = new Report(this,23,37,0,user,witness,"Signature");
                 ServerInterface server = (ServerInterface) Naming.lookup("rmi://127.0.0.1:" + 7000 + "/SERVER");
-                server.submitLocationReport(this,"user3",n);
+                server.subscribe(this,user);
+                server.submitLocationReport(this,user,n);
             }catch (UnmarshalException | ConnectException e) {
             }
         } catch (IOException | NotBoundException e) {

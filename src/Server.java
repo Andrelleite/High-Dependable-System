@@ -6,7 +6,6 @@ import java.io.*;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
 import java.rmi.server.*;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
@@ -14,13 +13,14 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.List;
+import java.util.HashMap;
 
 public class Server extends UnicastRemoteObject implements ServerInterface, Serializable{
 
     private static final long serialVersionUID = 1L;
-    private ArrayList<ClientInterface> clients;
+    private HashMap<String,ClientInterface> allSystemUsers;
     private ArrayList<Report> reps;
+    private ServerInterface server;
     private boolean imPrimary;
     private String IPV4;
     private int portRMI;
@@ -30,11 +30,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     public Server() throws IOException, NotBoundException, ClassNotFoundException {
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
-        this.clients = new ArrayList<>();
         synchronize(); // Updates the reports in list to the latest in file
-        ServerInterface server = retryConnection(7000);
+        evaluateData(0); // Evaluate reliability of users with reports delivered
+        this.server = retryConnection(7000);
         if (!imPrimary) {
-            checkPrimaryServer(server);
+            checkPrimaryServer(this.server);
         }
     }
 
@@ -81,7 +81,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     //=======================SERVER-SYS=================================================================================
 
     public void subscribe(ClientInterface c, String user) throws RemoteException{
-        this.clients.add(c);
+        this.allSystemUsers.put(user,c);
+        try {
+            updateUsers();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public String echo(String message) throws RemoteException {
@@ -247,6 +252,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     clientReports.remove(i);
                     i--;
                 }
+            }else if(clientReports.get(i).getPosX() != pos[0]){
+                clientReports.remove(i);
+                i--;
             }else if(clientReports.get(i).getEpoch() != epoch){
                 clientReports.remove(i);
                 i--;
@@ -277,7 +285,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private void synchronize() throws IOException, ClassNotFoundException {
 
-        File file=new File("ClientReports.txt");
+        File file = new File("ClientReports.txt");
+        File fileu = new File("SystemUsers.txt");
+
         if (file.length() == 0){
             this.reps = new ArrayList<>();
             System.out.println("Array is empty. Next update will make it usable.");
@@ -294,6 +304,23 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             ois.close();
         }
 
+        if (fileu.length() == 0){
+            this.allSystemUsers = new HashMap<>();
+            System.out.println("Array is empty. Next update will make it usable.");
+        }
+        else{
+            ObjectInputStream ois = new ObjectInputStream(
+                                    new FileInputStream(fileu));
+            this.allSystemUsers = (HashMap<String, ClientInterface>) ois.readObject();
+            System.out.println("LOAD SUCCESSFUL");
+            System.out.println("SIZE OF LOAD "+this.allSystemUsers.size());
+            for (String key : this.allSystemUsers.keySet()) {
+                System.out.println("Interface: "+key+" is "+this.allSystemUsers.get(key));
+            }
+            ois.close();
+        }
+
+
     }
 
     private void updateReports() throws IOException {
@@ -302,8 +329,20 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         ObjectOutputStream oos= new ObjectOutputStream(
                                 new FileOutputStream(file));
         oos.writeObject(this.reps);
-        System.out.println("FILE UPDATED. NEW SIZE "+this.reps.size());
+        System.out.println("FILE R UPDATED. NEW SIZE "+this.reps.size());
         oos.close();
+
+    }
+
+    private void updateUsers() throws IOException{
+
+        File file=new File("SystemUsers.txt");
+        ObjectOutputStream oos= new ObjectOutputStream(
+                                new FileOutputStream(file));
+        oos.writeObject(this.allSystemUsers);
+        System.out.println("FILE SU UPDATED. NEW SIZE "+this.allSystemUsers.size());
+        oos.close();
+
     }
 
     private ArrayList<Report> fetchReports(ClientInterface c, int epoch){
@@ -321,6 +360,50 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             }
         }
         return clientReports;
+    }
+
+    //==========================VERIFY DATA=============================================================================
+
+    private void evaluateData(int epoch){
+
+        String wit;
+        int minDist = 7;
+        double dist = 0.0;
+        double proofs,fails;
+        HashMap<String,int[]> mapping = new HashMap<>();
+        HashMap<String,Double> evaluation = new HashMap<>();
+
+        System.out.println("\n=====================================================EVALUATING EPOCH "+epoch);
+        for(Report rep : this.reps){
+            mapping.put(rep.getUsername(),new int[]{rep.getPosX(),rep.getPosY()});
+        }
+        for(String key : mapping.keySet()){
+            proofs = fails =  0;
+            for(Report rep : this.reps){
+                if(rep.getWitness().equals(key)){
+                    dist = Math.sqrt(Math.pow((rep.getPosX()-mapping.get(key)[0]),2)+Math.pow((rep.getPosY()-mapping.get(key)[1]),2));
+                    System.out.print(key+" -w> "+rep.getUsername()+" Factual Distance: "+dist);
+                    if(dist >= minDist){
+                        System.out.println(" *Byzantine Alert* ");
+                        fails++;
+                    }else{
+                        System.out.println(" *OK* ");
+                    }
+                    proofs++;
+                }
+            }
+            if(proofs != 0){
+                evaluation.put(key, (double) (fails/proofs));
+            }else{
+                evaluation.put(key, 0.0);
+            }
+        }
+        for(String key : evaluation.keySet()) {
+            System.out.print("| "+key + " rate of misses: "+evaluation.get(key)+" ");
+        }
+        System.out.println("\n=====================================================EVALUATION DONE\n");
+
+
     }
 
     //=======================MAIN=======================================================================================
