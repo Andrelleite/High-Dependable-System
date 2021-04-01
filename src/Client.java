@@ -1,8 +1,17 @@
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
+import java.security.*;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
 
 class Pair<A, B> {
@@ -175,14 +184,57 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                         int distance = (int) distaceCalc;
 
                         if(distance <= 15 && usernameFile.equals(username)){ //aqui o "0" depois é substituido pelo epoch atual
-                            //verificar parametros
-                            Report userReport = new Report(c,this.getCoordinate1(),this.getCoordinate2(),this.epoch,username,this.getUsername(),"assinatura");
+
+                            //Get time
+                            String time = java.time.LocalTime.now().toString();
+
+                            String s = username + time + this.getUsername() + this.getEpoch();
+
+                            //get client private key
+                            FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
+                            byte[] encoded1 = new byte[fis0.available()];
+                            fis0.read(encoded1);
+                            fis0.close();
+                            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+                            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+                            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+                            //Hash message
+                            byte[] messageByte0 = s.getBytes();
+                            MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                            digest0.update(messageByte0);
+                            byte[] digestByte0 = digest0.digest();
+                            String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+                            //sign the hash with the client's private key
+                            Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                            cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+                            byte[] hashBytes = Base64.getDecoder().decode(digest64);
+                            byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+                            String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+
+                            Report userReport = new Report(c,-1,-1,this.epoch,username,"","",this.getUsername(),signedHash,time);
                             return userReport;
                         }
                     }
                 } catch (NumberFormatException ex) { // handle your exception
                     System.out.println("Malformed input found!");
                     this.setBizantino(1);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (NoSuchAlgorithmException e) {
+                    e.printStackTrace();
+                } catch (InvalidKeySpecException e) {
+                    e.printStackTrace();
+                } catch (NoSuchPaddingException e) {
+                    e.printStackTrace();
+                } catch (InvalidKeyException e) {
+                    e.printStackTrace();
+                } catch (IllegalBlockSizeException e) {
+                    e.printStackTrace();
+                } catch (BadPaddingException e) {
+                    e.printStackTrace();
                 }
             }
             reader.close();
@@ -254,12 +306,45 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                     if(message == null){
                         return;
                     }
-                    //verificar estrutura do report
+
                     message.setPosX(this.getCoordinate1());
                     message.setPosY(this.getCoordinate2());
 
+                    //Get time
+                    String time = java.time.LocalTime.now().toString();
+
+                    String s1 = this.getUsername() + time  + this.getEpoch() + this.getCoordinate1() + this.getCoordinate2();
+
+                    //get client private key
+                    FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
+                    byte[] encoded1 = new byte[fis0.available()];
+                    fis0.read(encoded1);
+                    fis0.close();
+                    PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+                    KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+                    //Hash message
+                    byte[] messageByte0 = s1.getBytes();
+                    MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                    digest0.update(messageByte0);
+                    byte[] digestByte0 = digest0.digest();
+                    String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+                    //sign the hash with the client's private key
+                    Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                    cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+                    byte[] hashBytes = Base64.getDecoder().decode(digest64);
+                    byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+                    String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+                    message.setTimeStamp(time);
+                    message.setUserSignature(signedHash);
+
                     ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-                    s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
+                    String serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
+
+                    System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
 
                 } catch (Exception e) {
                     System.out.println("user + " + userToContact + " nao foi encontrado");

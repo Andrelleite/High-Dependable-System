@@ -91,123 +91,68 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public String echo(String message) throws RemoteException {
         System.out.println("received " + message);
-        String decryptedHash = "";
-        String finalMessage = "null";
-
-        try{
-            //get client public key
-            FileInputStream fis = new FileInputStream("src/keys/pub.key");
-            byte[] encoded = new byte[fis.available()];
-            fis.read(encoded);
-            fis.close();
-            X509EncodedKeySpec pubSpec = new X509EncodedKeySpec(encoded);
-            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
-            PublicKey pub = keyFacPub.generatePublic(pubSpec);
-
-            String hash = message.split(" | ")[2];
-            String content = message.split(" | ")[0];
-
-            //decrypt the hash
-            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            rsaCipher.init(Cipher.DECRYPT_MODE, pub);
-            byte[] hashBytesTime = Base64.getDecoder().decode(hash);
-            byte[] chunk1 = rsaCipher.doFinal(hashBytesTime);
-            decryptedHash = Base64.getEncoder().encodeToString(chunk1);
-
-            //Hash message
-            byte[] messageByte = content.getBytes();
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            digest.update(messageByte);
-            byte[] digestByte = digest.digest();
-            String digestB64 = Base64.getEncoder().encodeToString(digestByte);
-
-            if(digestB64.equals(decryptedHash)){
-                System.out.println("DEU CARALHO");
-                finalMessage = message;
-            }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (InvalidKeySpecException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (BadPaddingException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            //get server private key
-            FileInputStream fis = new FileInputStream("src/keys/priv.key");
-            byte[] encoded = new byte[fis.available()];
-            fis.read(encoded);
-            fis.close();
-            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded);
-            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
-
-            //Hash message
-            byte[] messageByte = finalMessage.getBytes();
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            digest.update(messageByte);
-            byte[] digestByte = digest.digest();
-            String digestB64 = Base64.getEncoder().encodeToString(digestByte);
-
-            //sign the hash with the server's private key
-            Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            cipherHash.init(Cipher.ENCRYPT_MODE, priv);
-            byte[] hashBytes = Base64.getDecoder().decode(digestB64);
-            byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
-            String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
-
-            finalMessage = finalMessage + " | " + signedHash;
-
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        } catch (IllegalBlockSizeException e) {
-            e.printStackTrace();
-        } catch (BadPaddingException e) {
-            e.printStackTrace();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (InvalidKeySpecException e) {
-            e.printStackTrace();
-        }
-
-
-        return finalMessage;
+        return message;
     }
 
     //=======================USER-METHODS===============================================================================
 
-    public void submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException{
+    public String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException{
         System.out.println("===============================================================================================");
         System.out.println("RECEIVED A NEW PROOF OF LOCATION FROM - "+user);
+        System.out.println("USER SIGNATURE: " + locationReport.getUserSignature());
+        System.out.println("TIMESTAMP: " + locationReport.getTimeStamp());
         System.out.println("POS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
         System.out.println("WITNESS: " + locationReport.getWitness());
         System.out.println("WITNESS SIGNATURE: " + locationReport.getWitnessSignature() );
+        System.out.println("WITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
         System.out.println("===============================================================================================");
 
         this.reps.add(locationReport);
         try {
             updateReports();
-        } catch (IOException e) {
+
+            //Get time
+            String time = java.time.LocalTime.now().toString();
+
+            String s1 = user + time + locationReport.getEpoch();
+
+            //get client private key
+            FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+            byte[] encoded1 = new byte[fis0.available()];
+            fis0.read(encoded1);
+            fis0.close();
+            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+            //Hash message
+            byte[] messageByte0 = s1.getBytes();
+            MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+            digest0.update(messageByte0);
+            byte[] digestByte0 = digest0.digest();
+            String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+            //sign the hash with the client's private key
+            Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+            byte[] hashBytes = Base64.getDecoder().decode(digest64);
+            byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+            String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+            String finalS = "time: " + time + " | signature: " + signedHash;
+
+            return finalS;
+
+        } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException | NoSuchPaddingException | InvalidKeyException e) {
             e.printStackTrace();
             System.out.println("Things went sideways :(");
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
         }
+
+        return "null";
     }
 
     public ArrayList<Report> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
