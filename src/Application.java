@@ -14,6 +14,7 @@ import static java.rmi.Naming.*;
 public class Application {
     public static void main(String[] args) {
         int epoch = 0;
+        int lastEpoch = 0;
         List<Client> clientsList = new ArrayList<>();
         List<String> clientsWithError = new ArrayList<>();
         Map<String, Integer> initClients = new HashMap<String, Integer>();
@@ -31,12 +32,15 @@ public class Application {
             while (reader.hasNextLine()) {
                 String data = reader.nextLine();
                 String username = data.split(",")[0];
+                String epochString = data.split(",")[1];
+                int tempEpoch = Integer.parseInt(epochString.split(" ")[1]);
+                if(tempEpoch > lastEpoch) lastEpoch = tempEpoch;
                 if(!initClients.containsKey(username)){
-                    String epochString = data.split(",")[1];
-                    int tempEpoch = Integer.parseInt(epochString.split(" ")[1]);
                     initClients.put(username, tempEpoch);
                 }
+
             }
+            System.out.println(lastEpoch);
             reader.close();
         } catch (FileNotFoundException e) {
             System.out.println("An error occurred.");
@@ -45,7 +49,7 @@ public class Application {
 
         System.out.println(initClients.entrySet());
         //fim da ultima epoch
-        while(true){
+        while(epoch <= lastEpoch){
             if(initClients.containsValue(epoch)){
                 int finalEpoch = epoch; //to use epoch in lambda expression
                 initClients.forEach((key, value) -> {

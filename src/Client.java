@@ -12,6 +12,9 @@ import java.rmi.server.UnicastRemoteObject;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 class Pair<A, B> {
@@ -100,7 +103,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
         return hasError;
     }
 
-    public void setBizantino(int value) {
+    public void setError(int value) {
         this.hasError = value;
     }
 
@@ -123,7 +126,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
     public void verifyCoords (int x, int y) {
         if(!(x >= 0 && x <= GRIDDIMENISION & y >= 0 && y <= GRIDDIMENISION)){
             System.out.println("Malformed input found! " + this.getUsername());
-            this.setBizantino(1);
+            this.setError(1);
         }
     }
 
@@ -144,10 +147,14 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                         int x2 = Integer.parseInt(coord1);
                         int y2 = Integer.parseInt(coord2);
                         verifyCoords(x2, y2);
+                        if(moveList.containsKey(epoch)){
+                            System.out.println("Two or more " + username +" coordinates in the same epoch!");
+                            this.setError(1);
+                        }
                         moveList.put(epoch, new Pair(x2, y2));
                     } catch (NumberFormatException ex) { // handle your exception
                         System.out.println("Malformed input found!");
-                        this.setBizantino(1);
+                        this.setError(1);
                     }
                 }
             }
@@ -220,7 +227,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                     }
                 } catch (NumberFormatException ex) { // handle your exception
                     System.out.println("Malformed input found!");
-                    this.setBizantino(1);
+                    this.setError(1);
                 } catch (IOException e) {
                     e.printStackTrace();
                 } catch (NoSuchAlgorithmException e) {
@@ -279,7 +286,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                     }
                 } catch (NumberFormatException ex) { // handle your exception
                     System.out.println("Malformed input found!");
-                    this.setBizantino(1);
+                    this.setError(1);
                 }
             }
             reader.close();
@@ -289,6 +296,58 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
         }
 
         return usersNearby;
+    }
+
+    public String verifyWitnessSignature(Report message, ClientInterface h) {
+        try {
+            FileInputStream fis1 = new FileInputStream("src/keys/" + message.getWitness() + "Pub.key");
+            byte[] decoded1 = new byte[fis1.available()];
+            fis1.read(decoded1);
+            fis1.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, pub);
+            byte[] hashBytes1 = java.util.Base64.getDecoder().decode(message.getWitnessSignature());
+            byte[] chunk = rsaCipher.doFinal(hashBytes1);
+            String witSiganture = Base64.getEncoder().encodeToString(chunk);
+
+            String verifyHash = message.getUsername() + message.getWitnessTimeStamp() + message.getWitness() + message.getEpoch();
+            byte[] messageByte1 = verifyHash.getBytes();
+            MessageDigest digest1 = MessageDigest.getInstance("SHA-256");
+            digest1.update(messageByte1);
+            byte[] digestByte1 = digest1.digest();
+            String digest64si = Base64.getEncoder().encodeToString(digestByte1);
+
+            if(witSiganture.equals(digest64si)){
+                return "Correct";
+            }else{
+                return "Error";
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            System.out.println("Wrong signature");
+            e.printStackTrace();
+            return "Error";
+        } catch (InvalidKeyException e) {
+            System.out.println("Wrong signature");
+            e.printStackTrace();
+            return "Error";
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+        return "Error";
     }
 
     public void requestLocationProof(){
@@ -307,11 +366,35 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                         return;
                     }
 
+                    if(message.getC() != this.getClientInterface() && !message.getUsername().equals(this.getUsername()) && message.getEpoch() != this.epoch && !message.getWitness().equals(userToContact)){
+                        return;
+                    }
+
+                    String verifyRet = verifyWitnessSignature(message, h);
+                    if(verifyRet.equals(("Error"))){
+                        return;
+                    }
+
                     message.setPosX(this.getCoordinate1());
                     message.setPosY(this.getCoordinate2());
 
                     //Get time
-                    String time = java.time.LocalTime.now().toString();
+                    LocalTime clientTime = LocalTime.now();
+                    String time = clientTime.toString();
+
+                    try{
+                        LocalTime witTime = LocalTime.parse(message.getWitnessTimeStamp());
+                        //4 segundos para possíveis atrasos na rede
+                        LocalTime clientTimeThreshold = clientTime.plusSeconds(4);
+                        if(clientTimeThreshold.compareTo(witTime) < 0){
+                            System.out.println("Possilble replay attack");
+                            return;
+                        }
+                    }
+                    catch (DateTimeParseException e) {
+                        System.out.println("Malformed report");
+                        e.printStackTrace();
+                    }
 
                     String s1 = this.getUsername() + time  + this.getEpoch() + this.getCoordinate1() + this.getCoordinate2();
 
