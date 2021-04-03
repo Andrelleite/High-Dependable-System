@@ -17,12 +17,12 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 
-public class Server extends UnicastRemoteObject implements ServerInterface, Serializable{
+public class Server extends UnicastRemoteObject implements ServerInterface, Serializable, Runnable{
 
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
-    private HashMap<String,ClientInterface> allSystemUsers;
-    private ArrayList<Report> reps;
+    private HashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
+    private ArrayList<Report> reps; // Structure of all reports in the system
     private ServerInterface server;
     private boolean imPrimary;
     private String IPV4;
@@ -33,8 +33,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     public Server() throws IOException, NotBoundException, ClassNotFoundException {
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
-        synchronize(); // Updates the reports in list to the latest in file
-        evaluateData(0); // Evaluate reliability of users with reports delivered
+        new Thread(this).start();
         this.server = retryConnection(7000);
         if (!imPrimary) {
             checkPrimaryServer(this.server);
@@ -84,7 +83,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     //=======================SERVER-SYS=================================================================================
 
     public void subscribe(ClientInterface c, String user) throws RemoteException{
-        this.allSystemUsers.put(user,c);
+        this.allSystemUsers.put(user,0.0);
         try {
             updateUsers();
         } catch (IOException e) {
@@ -245,7 +244,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
         else{
             ObjectInputStream ois = new ObjectInputStream(
-                                    new FileInputStream(file));
+                    new FileInputStream(file));
             this.reps = (ArrayList<Report>) ois.readObject();
             System.out.println("LOAD SUCCESSFUL");
             System.out.println("SIZE OF LOAD "+this.reps.size());
@@ -261,8 +260,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
         else{
             ObjectInputStream ois = new ObjectInputStream(
-                                    new FileInputStream(fileu));
-            this.allSystemUsers = (HashMap<String, ClientInterface>) ois.readObject();
+                    new FileInputStream(fileu));
+            this.allSystemUsers = (HashMap<String, Double>) ois.readObject();
             System.out.println("LOAD SUCCESSFUL");
             System.out.println("SIZE OF LOAD "+this.allSystemUsers.size());
             for (String key : this.allSystemUsers.keySet()) {
@@ -278,7 +277,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
         File file=new File("ClientReports.txt");
         ObjectOutputStream oos= new ObjectOutputStream(
-                                new FileOutputStream(file));
+                new FileOutputStream(file));
         oos.writeObject(this.reps);
         System.out.println("FILE R UPDATED. NEW SIZE "+this.reps.size());
         oos.close();
@@ -289,7 +288,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
         File file=new File("SystemUsers.txt");
         ObjectOutputStream oos= new ObjectOutputStream(
-                                new FileOutputStream(file));
+                new FileOutputStream(file));
         oos.writeObject(this.allSystemUsers);
         System.out.println("FILE SU UPDATED. NEW SIZE "+this.allSystemUsers.size());
         oos.close();
@@ -313,18 +312,30 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return clientReports;
     }
 
-    //==========================VERIFY DATA=============================================================================
+//==========================VERIFY DATA=============================================================================
 
-    private void evaluateData(int epoch){
+    @Override
+    /**
+     * Run Evaluator Thread
+     */
+    public void run() {
+        try {
+            synchronize(); // Updates the reports in list to the latest in file
+            evaluateData(); // Evaluate reliability of users with reports delivered
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void evaluateData() throws IOException {
 
         String wit;
         int minDist = 7;
-        double dist = 0.0;
-        double proofs,fails;
+        double dist,proofs,fails;
         HashMap<String,int[]> mapping = new HashMap<>();
         HashMap<String,Double> evaluation = new HashMap<>();
 
-        System.out.println("\n=====================================================EVALUATING EPOCH "+epoch);
+        System.out.println("\n=====================================================EVALUATING ALL EPOCHS ");
         for(Report rep : this.reps){
             mapping.put(rep.getUsername(),new int[]{rep.getPosX(),rep.getPosY()});
         }
@@ -344,15 +355,30 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 }
             }
             if(proofs != 0){
-                evaluation.put(key, (double) (fails/proofs));
+                if(fails == 0){
+                    evaluation.put(key, 0.0);
+                }else{
+                    evaluation.put(key, (double) (fails/proofs));
+                }
             }else{
                 evaluation.put(key, 0.0);
             }
         }
-        for(String key : evaluation.keySet()) {
-            System.out.print("| "+key + " rate of misses: "+evaluation.get(key)+" ");
-        }
+        updateRates(evaluation);
         System.out.println("\n=====================================================EVALUATION DONE\n");
+
+    }
+
+    private void updateRates(HashMap<String,Double> evaluation) throws IOException {
+
+        for(String key : evaluation.keySet()){
+            this.allSystemUsers.replace(key,evaluation.get(key));
+        }
+        for(String key : this.allSystemUsers.keySet()) {
+            System.out.println("| "+key + " rate of misses: "+this.allSystemUsers.get(key)+" ");
+        }
+        updateUsers();
+
     }
 
     private String verifyLocationReport(ClientInterface c,String user, Report locationReport) {
