@@ -60,10 +60,13 @@ public class Application {
                             String url = "rmi://127.0.0.1:7001/" + key;
                             rebind(url, client);
                             client.setUsername(key);
+                            ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + key);
+                            client.setClientInterface(h);
+                            System.out.println("->>>>>>>>> " + client.getClientInterface());
                             client.loadMoves();
                             clientsList.add(client);
                             System.out.println("new client added : " + key);
-                        } catch (RemoteException | MalformedURLException e) {
+                        } catch (RemoteException | MalformedURLException | NotBoundException e) {
                             e.printStackTrace();
                         }
                     }

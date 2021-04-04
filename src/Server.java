@@ -161,15 +161,66 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return "null";
     }
 
-    public ArrayList<Report> obtainLocationReport(ClientInterface c, int epoch) throws IOException, ClassNotFoundException {
-        return fetchReports(c,epoch);
+    public ServerReturn obtainLocationReport(ClientInterface c, int epoch, String username) throws IOException, ClassNotFoundException {
+        ArrayList<Report> reports = fetchReports(c,epoch);
+
+        //Get time
+        String time = java.time.LocalTime.now().toString();
+
+        String s1 = username + time + epoch;
+
+        String finalS = "";
+
+        try {
+            //get client private key
+            FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+            byte[] encoded1 = new byte[fis0.available()];
+            fis0.read(encoded1);
+            fis0.close();
+            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+            //Hash message
+            byte[] messageByte0 = s1.getBytes();
+            MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+            digest0.update(messageByte0);
+            byte[] digestByte0 = digest0.digest();
+            String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+            //sign the hash with the client's private key
+            Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+            byte[] hashBytes = Base64.getDecoder().decode(digest64);
+            byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+            String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+            finalS = "time: " + time + " | signature: " + signedHash;
+        }
+        catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+
+        ServerReturn serverReturn = new ServerReturn(finalS,reports);
+
+        return serverReturn;
 
     }
 
 
     //=======================AUTHORITY-METHODS==========================================================================
 
-    public ArrayList<Report> obtainLocationReport(String user, int epoch){
+    public ServerReturn obtainLocationReport(String user, int epoch){
 
         System.out.println("_______________________________________________________________________");
         System.out.println("LOCATION REPORTS REGARDING "+user+" REQUEST BY HA");
@@ -186,11 +237,65 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
         System.out.println("REQUEST SIZE "+clientReports.size());
         System.out.println("REQUEST COMPLETE");
-        return clientReports;
+
+        //Get time
+        String time = java.time.LocalTime.now().toString();
+
+        String s1 = "ha" + user + time + epoch;
+
+        String finalS = "";
+
+        try {
+            //get client private key
+            FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+            byte[] encoded1 = new byte[fis0.available()];
+            fis0.read(encoded1);
+            fis0.close();
+            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+            //Hash message
+            byte[] messageByte0 = s1.getBytes();
+            MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+            digest0.update(messageByte0);
+            byte[] digestByte0 = digest0.digest();
+            String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+            //sign the hash with the client's private key
+            Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+            byte[] hashBytes = Base64.getDecoder().decode(digest64);
+            byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+            String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+            finalS = "time: " + time + " | signature: " + signedHash;
+        }
+        catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        ServerReturn serverReturn = new ServerReturn(finalS,clientReports);
+
+        return serverReturn;
 
     }
 
-    public ArrayList<Report> obtainUsersAtLocation(int[] pos, int epoch){
+    public ServerReturn obtainUsersAtLocation(int[] pos, int epoch){
 
         System.out.println("_______________________________________________________________________");
         System.out.println("ALL LOCATION REPORTS FOR POSITION ("+pos[0]+","+pos[1]+") AT EPOCH "+epoch+" REQUEST BY HA");
@@ -213,7 +318,61 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         cleanRepetition(clientReports,0);
         System.out.println("REQUEST SIZE "+clientReports.size());
         System.out.println("REQUEST COMPLETE");
-        return clientReports;
+
+        //Get time
+        String time = java.time.LocalTime.now().toString();
+
+        String s1 = "ha" + pos[0] + pos[1] + time + epoch;
+
+        String finalS = "";
+
+        try {
+            //get client private key
+            FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+            byte[] encoded1 = new byte[fis0.available()];
+            fis0.read(encoded1);
+            fis0.close();
+            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+            //Hash message
+            byte[] messageByte0 = s1.getBytes();
+            MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+            digest0.update(messageByte0);
+            byte[] digestByte0 = digest0.digest();
+            String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+            //sign the hash with the client's private key
+            Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+            byte[] hashBytes = Base64.getDecoder().decode(digest64);
+            byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+            String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+            finalS = "time: " + time + " | signature: " + signedHash;
+        }
+        catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        ServerReturn serverReturn = new ServerReturn(finalS,clientReports);
+
+        return serverReturn;
     }
 
     //=======================DATA-FILES-METHODS=========================================================================

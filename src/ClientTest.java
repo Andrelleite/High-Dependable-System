@@ -50,7 +50,20 @@ public class ClientTest extends UnicastRemoteObject implements ClientInterface {
                 ServerInterface server = (ServerInterface) Naming.lookup("rmi://127.0.0.1:" + 7000 + "/SERVER");
                 server.subscribe(this,user);
                 server.submitLocationReport(this,user,n);
+
+                ServerReturn s = server.obtainLocationReport("user1",0);
+                System.out.println("bruhhhh + " + s.getServerProof());
+                ArrayList<Report> reports = s.getReports();
+                if(reports != null){
+                    for(int i = 0; i < reports.size(); i++){
+                        System.out.println("\tENTRY "+(i+1)+": "+reports.get(i).getUsername());
+                    }
+                }else{
+                    System.out.println("No entries for that combination.");
+                }
             }catch (UnmarshalException | ConnectException e) {
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
             }
         } catch (IOException | NotBoundException e) {
             System.out.println("Exception in RMIClient main: " + e);
