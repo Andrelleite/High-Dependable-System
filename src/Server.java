@@ -33,6 +33,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     public Server() throws IOException, NotBoundException, ClassNotFoundException {
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
+        synchronize(); // Updates the reports in list to the latest in file
         new Thread(this).start();
         this.server = retryConnection(7000);
         if (!imPrimary) {
@@ -100,7 +101,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException{
         String verifyRet = verifyLocationReport(c, user, locationReport);
-        if(verifyRet.equals("Correct")){
+        if(verifyRet.equals("Correct") && !checkClone(locationReport)){
             System.out.println("===============================================================================================");
             System.out.println("RECEIVED A NEW PROOF OF LOCATION FROM - "+user);
             System.out.println("USER SIGNATURE: " + locationReport.getUserSignature());
@@ -216,7 +217,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn;
 
     }
-
 
     //=======================AUTHORITY-METHODS==========================================================================
 
@@ -377,6 +377,23 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================DATA-FILES-METHODS=========================================================================
 
+    private boolean checkClone(Report report){
+
+        for(Report entry: reps){
+            if (entry.getEpoch() == report.getEpoch()){
+                if (entry.getPosY() == report.getPosY() && entry.getPosX() == report.getPosX()) {
+                    if (entry.getUsername().equals(report.getUsername())) {
+                        if (entry.getWitness().equals(report.getWitness())) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+
+    }
+
     private void cleanRepetition(ArrayList<Report> list,int op){
 
         if(op == 0){ // operation 0 for removal of user repetition
@@ -479,9 +496,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
      */
     public void run() {
         try {
-            synchronize(); // Updates the reports in list to the latest in file
             evaluateData(); // Evaluate reliability of users with reports delivered
-        } catch (IOException | ClassNotFoundException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }

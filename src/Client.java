@@ -2,11 +2,13 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.swing.plaf.synth.SynthOptionPaneUI;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
 import java.security.*;
@@ -44,7 +46,7 @@ class Pair<A, B> {
 
 }
 
-public class Client extends UnicastRemoteObject implements ClientInterface{
+public class Client extends UnicastRemoteObject implements ClientInterface, Runnable{
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
 
@@ -78,7 +80,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
         this.clientsWithError = clientsWithError;
     }
 
-    public void setEpoch(int epoch) {
+    public void setEpoch(int epoch) throws InterruptedException, IOException, ClassNotFoundException {
         this.epoch = epoch;
         if(moveList.containsKey(epoch)){
             this.setCoordinate1(moveList.get(epoch).getFirst());
@@ -113,6 +115,18 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
 
     public void setUsername(String username) {
         this.username = username;
+        // REPORT SUBMISSION
+        try{
+            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+            s.subscribe(this.getClientInterface(),this.getUsername());
+        }catch (RemoteException | MalformedURLException | NotBoundException e){
+            try {
+                retrySub(this.getClientInterface(),this.getUsername());
+            } catch (InterruptedException | IOException | NotBoundException interruptedException) {
+                System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+                return;
+            }
+        }
     }
 
     public Client() throws RemoteException {
@@ -123,6 +137,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
         System.out.println("recebeu!");
         return message;
     }
+
     public void verifyCoords (int x, int y) {
         if(!(x >= 0 && x <= GRIDDIMENISION & y >= 0 && y <= GRIDDIMENISION)){
             System.out.println("Malformed input found! " + this.getUsername());
@@ -228,15 +243,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                 } catch (NumberFormatException ex) { // handle your exception
                     System.out.println("Malformed input found!");
                     this.setError(1);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeySpecException e) {
-                    e.printStackTrace();
-                } catch (NoSuchPaddingException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeyException e) {
+                } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException | NoSuchPaddingException | InvalidKeyException e) {
                     e.printStackTrace();
                 } catch (IllegalBlockSizeException e) {
                     e.printStackTrace();
@@ -350,9 +357,10 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
         return "Error";
     }
 
-    public void requestLocationProof(){
+    public void requestLocationProof() throws InterruptedException, IOException, ClassNotFoundException {
 
         ArrayList<String> usersToContact = findUser();
+        Report message = null;
 
         if(usersToContact.size() != 0){
             Iterator i = usersToContact.iterator();
@@ -361,7 +369,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                 System.out.println(this.username + " trying to contact " + userToContact);
                 try {
                     ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + userToContact);
-                    Report message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.epoch);
+                    message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.epoch);
                     if(message == null){
                         return;
                     }
@@ -424,16 +432,25 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
                     message.setTimeStamp(time);
                     message.setUserSignature(signedHash);
 
-                    ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-                    String serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
-
-                    System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
+                    // REPORT SUBMISSION
+                    try{
+                        ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                        String serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
+                        System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
+                    }catch (RemoteException | MalformedURLException | NotBoundException e){
+                        try {
+                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
+                        } catch (InterruptedException | IOException | NotBoundException interruptedException) {
+                            System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+                            return;
+                        }
+                    }
 
                 } catch (Exception e) {
                     System.out.println("user + " + userToContact + " nao foi encontrado");
                     System.out.println("Exception in main: " + e);
                     e.printStackTrace();
-
                 }
             }
         }
@@ -441,13 +458,55 @@ public class Client extends UnicastRemoteObject implements ClientInterface{
             System.out.println(this.getUsername() + " não tem users perto.");
         }
 
-
-
     }
+
+    /*========================================== CONNECTION TIMEOUTS =================================================*/
+
+    private String retry(ClientInterface it, String username,Report message) throws InterruptedException, IOException, NotBoundException {
+        String serverSignature;
+        ServerInterface s;
+        Thread thread = new Thread(this);
+        thread.start();
+        thread.join();
+        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+        serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
+        return serverSignature;
+    }
+
+    private void retrySub(ClientInterface it, String username) throws InterruptedException, IOException, NotBoundException {
+        ServerInterface s;
+        Thread thread = new Thread(this);
+        thread.start();
+        thread.join();
+        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+        s.subscribe(this.getClientInterface(),this.getUsername());
+    }
+
+    @Override
+    public void run(){
+        ServerInterface s = null;
+        int tries = 0;
+        while(s == null && tries < 5){
+            System.out.println("New try.");
+            try {
+                Thread.sleep(2000);
+                s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+            } catch (InterruptedException e) {
+                /*exit*/
+            } catch (RemoteException | MalformedURLException | NotBoundException e){
+                /*Try new connection in 2 seconds*/
+                System.out.println("Retrying connection to server.");
+            }
+            tries++;
+        }
+    }
+
+    /*================================================== MAIN ========================================================*/
 
     public static void main(String[] args) {
 
         try {
+            /* Barney, do something.*/
         } catch (Exception e) {
             System.out.println("Exception in main: " + e);
             e.printStackTrace();

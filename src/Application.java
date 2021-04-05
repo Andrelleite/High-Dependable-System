@@ -12,7 +12,8 @@ import java.util.*;
 import static java.rmi.Naming.*;
 
 public class Application {
-    public static void main(String[] args) {
+
+    public static void main(String[] args) throws InterruptedException, IOException, ClassNotFoundException {
         int epoch = 0;
         int lastEpoch = 0;
         List<Client> clientsList = new ArrayList<>();
@@ -81,11 +82,7 @@ public class Application {
                     clientsWithError.add(client.getUsername());
                     try {
                         unbind("rmi://127.0.0.1:7001/" + client.getUsername());
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    } catch (NotBoundException e) {
-                        e.printStackTrace();
-                    } catch (MalformedURLException e) {
+                    } catch (RemoteException | NotBoundException | MalformedURLException e) {
                         e.printStackTrace();
                     }
                 }else{

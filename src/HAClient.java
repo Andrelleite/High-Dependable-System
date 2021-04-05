@@ -65,12 +65,18 @@ public class HAClient extends Thread{
         Thread thread = new Thread(this);
         thread.start();
         thread.join();
-        communicate(this.h);
+        if(this.h == null){
+            System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+            return;
+        }else{
+            communicate(this.h);
+        }
     }
 
     @Override
     public void run(){
-        while(this.h == null){
+        int tries = 0;
+        while(this.h == null && tries < 5){
             System.out.println("New try.");
             try {
                 Thread.sleep(2000);
@@ -80,6 +86,7 @@ public class HAClient extends Thread{
             } catch (RemoteException | MalformedURLException | NotBoundException e){
                 /*Try new connection in 2 seconds*/
             }
+            tries++;
         }
     }
 
