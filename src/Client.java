@@ -19,6 +19,8 @@ import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 class Pair<A, B> {
     A first = null;
     B second = null;
@@ -86,6 +88,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             this.setCoordinate1(moveList.get(epoch).getFirst());
             this.setCoordinate2(moveList.get(epoch).getSecond());
             requestLocationProof();
+            getReports();
         }
     }
 
@@ -383,8 +386,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         return;
                     }
 
-                    message.setPosX(this.getCoordinate1());
-                    message.setPosY(this.getCoordinate2());
+                    //message.setPosX(this.getCoordinate1());
+                    //message.setPosY(this.getCoordinate2());
 
                     //Get time
                     LocalTime clientTime = LocalTime.now();
@@ -429,6 +432,36 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
+                    //encrypt the report's sensitive information
+
+                    //get server public key
+                    FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+                    byte[] encoded2 = new byte[fis01.available()];
+                    fis01.read(encoded2);
+                    fis01.close();
+                    X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
+                    KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+                    PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+                    Cipher cipherReport = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                    cipherReport.init(Cipher.ENCRYPT_MODE, pub);
+
+                    String info = "posXq" + this.getCoordinate1() + "wposYq" + this.getCoordinate2() + "wepochq" + message.getEpoch();
+                    message.setEpoch(-1);
+
+                    byte[] infoBytes = Base64.getDecoder().decode(info);
+                    byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                    String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                    message.setEncryptedInfo(loc);
+
+                    //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                    byte[] cipherBytes3 = cipherReport.doFinal(message.getWitness().getBytes());
+                    String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+
+                    message.setWitness(loc3);
+
                     message.setTimeStamp(time);
                     message.setUserSignature(signedHash);
 
@@ -456,6 +489,107 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         }
         else{
             System.out.println(this.getUsername() + " não tem users perto.");
+        }
+
+    }
+
+    public void getReports() throws RemoteException{
+
+        try {
+            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+
+            String epoch = ""+this.epoch;
+
+            //get server public key
+            FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+            byte[] encoded2 = new byte[fis01.available()];
+            fis01.read(encoded2);
+            fis01.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+            Cipher cipherReport = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipherReport.init(Cipher.ENCRYPT_MODE, pub);
+
+            byte[] cipherBytes3 = cipherReport.doFinal(epoch.getBytes());
+            String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+            ServerReturn r = s.obtainLocationReport(this.getClientInterface(),loc3,this.getUsername());
+
+            FileInputStream fis0 = new FileInputStream("src/keys/"+this.getUsername()+"Priv.key");
+            byte[] encoded1 = new byte[fis0.available()];
+            fis0.read(encoded1);
+            fis0.close();
+            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, priv);
+
+            Iterator i = r.getReports().iterator();
+            while (i.hasNext()) {
+
+                Report re = (Report) i.next();
+
+                /*System.out.println("===============================================================================================");
+                System.out.println("RECEIVED THE SERVER PROOF0 OF LOCATION FROM - "+ re.getUsername());
+                System.out.println("USER SIGNATURE: " + re.getUserSignature());
+                System.out.println("TIMESTAMP: " + re.getTimeStamp());
+                System.out.println("POS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
+                System.out.println("WITNESS: " + re.getWitness());
+                System.out.println("WITNESS SIGNATURE: " + re.getWitnessSignature());
+                System.out.println("WITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
+                System.out.println("===============================================================================================");*/
+
+                byte[] hashBytes1 = java.util.Base64.getDecoder().decode(re.getEncryptedInfo());
+                byte[] chunk = rsaCipher.doFinal(hashBytes1);
+                String info = Base64.getEncoder().encodeToString(chunk);
+                info = info.split("=")[0];
+
+                re.setPosX(Integer.parseInt(info.split("w")[0].split("q")[1]));
+                re.setPosY(Integer.parseInt(info.split("w")[1].split("q")[1]));
+                re.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
+
+                byte[] hashBytes3 = java.util.Base64.getDecoder().decode(re.getWitness());
+                byte[] chunk2 = rsaCipher.doFinal(hashBytes3);
+                String witness =  new String(chunk2, UTF_8);
+
+                re.setWitness(witness);
+
+                System.out.println("===============================================================================================");
+                System.out.println("RECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername());
+                System.out.println("USER SIGNATURE: " + re.getUserSignature());
+                System.out.println("TIMESTAMP: " + re.getTimeStamp());
+                System.out.println("POS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
+                System.out.println("WITNESS: " + re.getWitness());
+                System.out.println("WITNESS SIGNATURE: " + re.getWitnessSignature());
+                System.out.println("WITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
+                System.out.println("===============================================================================================");
+
+            }
+
+        } catch (NotBoundException e) {
+            e.printStackTrace();
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
         }
 
     }

@@ -10,6 +10,7 @@ public class Report implements Serializable {
     private int posX;
     private int posY;
     private int epoch;
+    private String encryptedInfo;
     private String timeStamp;
     private String witnessTimeStamp;
 
@@ -78,5 +79,25 @@ public class Report implements Serializable {
 
     public void setTimeStamp(String timeStamp) {
         this.timeStamp = timeStamp;
+    }
+
+    public void setEncryptedInfo(String encryptedInfo) {
+        this.encryptedInfo = encryptedInfo;
+    }
+
+    public String getEncryptedInfo() {
+        return encryptedInfo;
+    }
+
+    public void setEpoch(int epoch) {
+        this.epoch = epoch;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public void setWitness(String witness) {
+        this.witness = witness;
     }
 }

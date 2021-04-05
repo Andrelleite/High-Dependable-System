@@ -40,6 +40,10 @@ public class ClientTest extends UnicastRemoteObject implements ClientInterface {
 
     //=======================METHODS====================================================================================
 
+    public void getReports() throws RemoteException{
+
+    };
+
     protected void makeConnection(){
 
         try {
