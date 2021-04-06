@@ -1,8 +1,10 @@
+import javax.print.attribute.standard.RequestingUserName;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
+
 
 public class HAClient extends Thread{
 
@@ -32,29 +34,39 @@ public class HAClient extends Thread{
     private void communicate(ServerInterface h) throws IOException, ClassNotFoundException {
 
         ArrayList<Report> reports;
-
-        /* All users location report at specific epochs *test* */
-        System.out.println("$$$ USERS AT: ("+10+","+20+") IN EPOCH"+2+" $$$");
-        reports = (ArrayList<Report>) h.obtainUsersAtLocation(new int[]{10,20},2).getReports();
-        if(reports != null){
-            for(int i = 0; i < reports.size(); i++){
-                System.out.println("\tENTRY "+(i+1)+": "+reports.get(i).getUsername());
+        System.setProperty("java.rmi.transport.tcp.responseTimeout", "2000");
+        try {
+            /* All users location report at specific epochs *test* */
+            System.out.println("$$$ USERS AT: ("+10+","+20+") IN EPOCH"+2+" $$$");
+            reports = (ArrayList<Report>) h.obtainUsersAtLocation(new int[]{10,20},2).getReports();
+            if(reports != null){
+                for(int i = 0; i < reports.size(); i++){
+                    System.out.println("\tENTRY "+(i+1)+": "+reports.get(i).getUsername());
+                }
+            }else{
+                System.out.println("No entries for that combination.");
             }
-        }else{
-            System.out.println("No entries for that combination.");
-        }
 
-        /* Specific user report at specific epochs *test* */
-        System.out.println("$$$ LOCATIONS OF USER: "+"user1"+" $$$");
-        reports = (ArrayList<Report>) h.obtainLocationReport("user1",2).getReports();
-        if(reports != null){
-            for(int i = 0; i < reports.size(); i++){
-                System.out.println("\tENTRY "+(i+1)+": "+
-                        reports.get(i).getUsername()+" -> ("+
-                        reports.get(i).getPosX()+","+reports.get(i).getPosY()+")");
+            /* Specific user report at specific epochs *test* */
+            System.out.println("$$$ LOCATIONS OF USER: "+"user1"+" $$$");
+            reports = (ArrayList<Report>) h.obtainLocationReport("user1",2).getReports();
+            if(reports != null){
+                for(int i = 0; i < reports.size(); i++){
+                    System.out.println("\tENTRY "+(i+1)+": "+
+                            reports.get(i).getUsername()+" -> ("+
+                            reports.get(i).getPosX()+","+reports.get(i).getPosY()+")");
+                }
+            }else{
+                System.out.println("No entries for that combination.");
             }
-        }else{
-            System.out.println("No entries for that combination.");
+
+        }catch (ConnectException | UnmarshalException e){
+            try {
+                this.h = null;
+                retry();
+            } catch (InterruptedException interruptedException) {
+                System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+            }
         }
 
     }
