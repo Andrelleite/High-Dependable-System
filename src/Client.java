@@ -118,13 +118,28 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     public void setUsername(String username) {
         this.username = username;
+
         // REPORT SUBMISSION
         try{
             ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
             s.subscribe(this.getClientInterface(),this.getUsername());
-        }catch (RemoteException | MalformedURLException | NotBoundException e){
+        } catch (ConnectException ev){
             try {
                 retrySub(this.getClientInterface(),this.getUsername());
+            } catch (InterruptedException | IOException | NotBoundException interruptedException) {
+                System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+                return;
+            }
+        } catch (RemoteException | MalformedURLException | NotBoundException e){
+            try {
+                retrySub(this.getClientInterface(),this.getUsername());
+            } catch (ConnectException ev){
+                try {
+                    retrySub(this.getClientInterface(),this.getUsername());
+                } catch (InterruptedException | IOException | NotBoundException interruptedException) {
+                    System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+                    return;
+                }
             } catch (InterruptedException | IOException | NotBoundException interruptedException) {
                 System.out.println("SERVICE IS DOWN. COME BACK LATER.");
                 return;
@@ -470,8 +485,19 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
                         String serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
                         System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
-                    }catch (RemoteException | MalformedURLException | NotBoundException e){
+                    } catch (ConnectException ev){
                         try {
+                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
+                        } catch (InterruptedException | IOException | NotBoundException interruptedException) {
+                            System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+                            return;
+                        }
+                    } catch (RemoteException | MalformedURLException | NotBoundException e){
+                        try {
+                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
+                        } catch (ConnectException ev){
                             String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
                             System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                         } catch (InterruptedException | IOException | NotBoundException interruptedException) {
