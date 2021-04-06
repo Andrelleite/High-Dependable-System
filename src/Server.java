@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Iterator;
-
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class Server extends UnicastRemoteObject implements ServerInterface, Serializable, Runnable{
@@ -37,7 +36,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
         synchronize(); // Updates the reports in list to the latest in file
-        new Thread(this).start();
         this.server = retryConnection(7000);
         if (!imPrimary) {
             checkPrimaryServer(this.server);
@@ -132,7 +130,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             locationReport.setWitness(witness);
 
         }
-         catch (NoSuchAlgorithmException e) {
+        catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -629,66 +627,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
      * Run Evaluator Thread
      */
     public void run() {
-        try {
-            evaluateData(); // Evaluate reliability of users with reports delivered
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+       
     }
-
-    private void evaluateData() throws IOException {
-
-        String wit;
-        int minDist = 7;
-        double dist,proofs,fails;
-        HashMap<String,int[]> mapping = new HashMap<>();
-        HashMap<String,Double> evaluation = new HashMap<>();
-
-        System.out.println("\n=====================================================EVALUATING ALL EPOCHS ");
-        for(Report rep : this.reps){
-            mapping.put(rep.getUsername(),new int[]{rep.getPosX(),rep.getPosY()});
-        }
-        for(String key : mapping.keySet()){
-            proofs = fails =  0;
-            for(Report rep : this.reps){
-                if(rep.getWitness().equals(key)){
-                    dist = Math.sqrt(Math.pow((rep.getPosX()-mapping.get(key)[0]),2)+Math.pow((rep.getPosY()-mapping.get(key)[1]),2));
-                    System.out.print(key+" -w> "+rep.getUsername()+" Factual Distance: "+dist);
-                    if(dist >= minDist){
-                        System.out.println(" *Byzantine Alert* ");
-                        fails++;
-                    }else{
-                        System.out.println(" *OK* ");
-                    }
-                    proofs++;
-                }
-            }
-            if(proofs != 0){
-                if(fails == 0){
-                    evaluation.put(key, 0.0);
-                }else{
-                    evaluation.put(key, (double) (fails/proofs));
-                }
-            }else{
-                evaluation.put(key, 0.0);
-            }
-        }
-        updateRates(evaluation);
-        System.out.println("\n=====================================================EVALUATION DONE\n");
-
-    }
-
-    private void updateRates(HashMap<String,Double> evaluation) throws IOException {
-
-        for(String key : evaluation.keySet()){
-            this.allSystemUsers.replace(key,evaluation.get(key));
-        }
-        for(String key : this.allSystemUsers.keySet()) {
-            System.out.println("| "+key + " rate of misses: "+this.allSystemUsers.get(key)+" ");
-        }
-        updateUsers();
-
-    }
+    
 
     private String verifyLocationReport(ClientInterface c,String user, Report locationReport) {
         //witness signature
