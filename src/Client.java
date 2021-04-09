@@ -1,7 +1,4 @@
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
+import javax.crypto.*;
 import javax.swing.plaf.synth.SynthOptionPaneUI;
 import java.io.File;
 import java.io.FileInputStream;
@@ -56,11 +53,20 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     private ClientInterface clientInterface;
     private int coordinate1;
     private int coordinate2;
+    private SecretKey symKey;
+    private String key;
     private int epoch;
     private int hasError = 0;
     private Map<Integer, Pair<Integer,Integer>> moveList = new HashMap<Integer, Pair<Integer,Integer>>();
     private List<String> clientsWithError = new ArrayList<String>();
 
+    public String getKey() {
+        return key;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
 
     public ClientInterface getClientInterface() {
         return clientInterface;
@@ -68,6 +74,14 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     public void setClientInterface(ClientInterface clientInterface) {
         this.clientInterface = clientInterface;
+    }
+
+    public SecretKey getSymKey() {
+        return symKey;
+    }
+
+    public void setSymKey(SecretKey symKey) {
+        this.symKey = symKey;
     }
 
     public void setCoordinate1(int coordinate1) {
@@ -122,7 +136,34 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         // REPORT SUBMISSION
         try{
             ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-            s.subscribe(this.getClientInterface(),this.getUsername());
+
+            SecretKey secretKey = KeyGenerator.getInstance("AES").generateKey();
+            String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
+            System.out.println("lado do client: " + encodedKey);
+            this.setSymKey(secretKey);
+
+            FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+            byte[] encoded2 = new byte[fis01.available()];
+            fis01.read(encoded2);
+            fis01.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+            Cipher cipherRSA = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipherRSA.init(Cipher.ENCRYPT_MODE, pub);
+            byte[] keyBytes = Base64.getDecoder().decode(encodedKey);
+            byte[] cipherBytes = cipherRSA.doFinal(keyBytes);
+            String encryptedKey = Base64.getEncoder().encodeToString(cipherBytes);
+
+            this.setKey(encryptedKey);
+
+            s.subscribe(this.getClientInterface(),this.getUsername(), encryptedKey);
+
+
+
+
+
         } catch (ConnectException ev){
             try {
                 retrySub(this.getClientInterface(),this.getUsername());
@@ -144,6 +185,22 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                 System.out.println("SERVICE IS DOWN. COME BACK LATER.");
                 return;
             }
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
         }
     }
 
@@ -450,7 +507,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     //encrypt the report's sensitive information
 
                     //get server public key
-                    FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+                    /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
                     byte[] encoded2 = new byte[fis01.available()];
                     fis01.read(encoded2);
                     fis01.close();
@@ -459,7 +516,10 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
 
                     Cipher cipherReport = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    cipherReport.init(Cipher.ENCRYPT_MODE, pub);
+                    cipherReport.init(Cipher.ENCRYPT_MODE, pub);*/
+
+                    Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                    cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
 
                     String info = "posXq" + this.getCoordinate1() + "wposYq" + this.getCoordinate2() + "wepochq" + message.getEpoch();
                     message.setEpoch(-1);
@@ -527,7 +587,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             String epoch = ""+this.epoch;
 
             //get server public key
-            FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+            /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
             byte[] encoded2 = new byte[fis01.available()];
             fis01.read(encoded2);
             fis01.close();
@@ -536,14 +596,17 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
 
             Cipher cipherReport = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            cipherReport.init(Cipher.ENCRYPT_MODE, pub);
+            cipherReport.init(Cipher.ENCRYPT_MODE, pub);*/
+
+            Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
 
             byte[] cipherBytes3 = cipherReport.doFinal(epoch.getBytes());
             String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
 
             ServerReturn r = s.obtainLocationReport(this.getClientInterface(),loc3,this.getUsername());
 
-            FileInputStream fis0 = new FileInputStream("src/keys/"+this.getUsername()+"Priv.key");
+            /*FileInputStream fis0 = new FileInputStream("src/keys/"+this.getUsername()+"Priv.key");
             byte[] encoded1 = new byte[fis0.available()];
             fis0.read(encoded1);
             fis0.close();
@@ -552,7 +615,10 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            rsaCipher.init(Cipher.DECRYPT_MODE, priv);
+            rsaCipher.init(Cipher.DECRYPT_MODE, priv);*/
+
+            Cipher rsaCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, this.getSymKey());
 
             Iterator i = r.getReports().iterator();
             while (i.hasNext()) {
@@ -610,9 +676,9 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             e.printStackTrace();
         } catch (InvalidKeyException e) {
             e.printStackTrace();
-        } catch (InvalidKeySpecException e) {
+        } /*catch (InvalidKeySpecException e) {
             e.printStackTrace();
-        } catch (BadPaddingException e) {
+        } */catch (BadPaddingException e) {
             e.printStackTrace();
         } catch (IllegalBlockSizeException e) {
             e.printStackTrace();
@@ -639,7 +705,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         thread.start();
         thread.join();
         s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-        s.subscribe(this.getClientInterface(),this.getUsername());
+        s.subscribe(this.getClientInterface(),this.getUsername(), this.getKey());
     }
 
     @Override

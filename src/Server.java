@@ -1,7 +1,5 @@
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
+import javax.crypto.*;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.rmi.*;
@@ -23,6 +21,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
+    public  HashMap<String,SecretKey> symKey;
     private HashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
     private ArrayList<Report> reps; // Structure of all reports in the system
     private ServerInterface server;
@@ -35,6 +34,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     public Server() throws IOException, NotBoundException, ClassNotFoundException {
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
+        this.symKey = new HashMap<>();
         synchronize(); // Updates the reports in list to the latest in file
         this.server = retryConnection(7000);
         if (!imPrimary) {
@@ -84,11 +84,48 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================SERVER-SYS=================================================================================
 
-    public void subscribe(ClientInterface c, String user) throws RemoteException{
+    public void subscribe(ClientInterface c, String user, String key) throws RemoteException{
         this.allSystemUsers.put(user,0.0);
         try {
             updateUsers();
+
+            FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+            byte[] encoded1 = new byte[fis0.available()];
+            fis0.read(encoded1);
+            fis0.close();
+            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, priv);
+            byte[] hashBytes = java.util.Base64.getDecoder().decode(key);
+            byte[] chunk = rsaCipher.doFinal(hashBytes);
+            String decryptedKey = Base64.getEncoder().encodeToString(chunk);
+            byte[] decodedKey = Base64.getDecoder().decode(decryptedKey);
+            SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
+
+            String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
+
+            this.symKey.put(user,originalKey);
+
+            System.out.println("lado do server: " + encodedKey);
+
+
+            //this.setSymKey(originalKey);
         } catch (IOException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
             e.printStackTrace();
         }
     }
@@ -104,7 +141,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
         try{
             //get server private key
-            FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+            /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
             byte[] encoded1 = new byte[fis0.available()];
             fis0.read(encoded1);
             fis0.close();
@@ -113,9 +150,14 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            rsaCipher.init(Cipher.DECRYPT_MODE, priv);
+            rsaCipher.init(Cipher.DECRYPT_MODE, priv);*/
+
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, this.symKey.get(user));
+
+
             byte[] hashBytes1 = java.util.Base64.getDecoder().decode(locationReport.getEncryptedInfo());
-            byte[] chunk = rsaCipher.doFinal(hashBytes1);
+            byte[] chunk = cipher.doFinal(hashBytes1);
             String info = Base64.getEncoder().encodeToString(chunk);
             info = info.split("=")[0];
 
@@ -124,7 +166,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             locationReport.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
 
             byte[] hashBytes3 = java.util.Base64.getDecoder().decode(locationReport.getWitness());
-            byte[] chunk2 = rsaCipher.doFinal(hashBytes3);
+            byte[] chunk2 = cipher.doFinal(hashBytes3);
             String witness =  new String(chunk2, UTF_8);
 
             locationReport.setWitness(witness);
@@ -132,13 +174,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
         catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
-        } catch (FileNotFoundException e) {
+        } /*catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InvalidKeySpecException e) {
             e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
+        } */catch (NoSuchPaddingException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
             e.printStackTrace();
@@ -219,7 +261,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
         try{
             //get server private key
-            FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+            /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
             byte[] encoded1 = new byte[fis0.available()];
             fis0.read(encoded1);
             fis0.close();
@@ -228,10 +270,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            rsaCipher.init(Cipher.DECRYPT_MODE, priv);
+            rsaCipher.init(Cipher.DECRYPT_MODE, priv);*/
+
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, this.symKey.get(username));
 
             byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
-            byte[] chunk2 = rsaCipher.doFinal(hashBytes3);
+            byte[] chunk2 = cipher.doFinal(hashBytes3);
             String parse =  new String(chunk2, UTF_8);
 
             ep = Integer.parseInt(parse);
@@ -241,13 +286,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
         catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
-        } catch (FileNotFoundException e) {
+        }/* catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InvalidKeySpecException e) {
             e.printStackTrace();
-        } catch (NoSuchPaddingException e) {
+        } */catch (NoSuchPaddingException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
             e.printStackTrace();
@@ -271,6 +316,43 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         String finalS = "";
 
         try {
+            //get client public key
+            /*FileInputStream fis01 = new FileInputStream("src/keys/" + username + "Pub.key");
+            byte[] encoded2 = new byte[fis01.available()];
+            fis01.read(encoded2);
+            fis01.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+            Cipher cipherReport = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipherReport.init(Cipher.ENCRYPT_MODE, pub);*/
+
+            Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipherReport.init(Cipher.ENCRYPT_MODE, this.symKey.get(username));
+
+            Iterator i = reports.iterator();
+            while (i.hasNext()) {
+                Report r = (Report) i.next();
+
+                String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+                r.setEpoch(-1);
+                r.setPosX(-1);
+                r.setPosY(-1);
+
+                byte[] infoBytes = Base64.getDecoder().decode(info);
+                byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                r.setEncryptedInfo(loc);
+
+                //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
+                String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+                r.setWitness(loc3);
+            }
+
             //get server private key
             FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
             byte[] encoded1 = new byte[fis0.available()];
@@ -295,40 +377,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
             finalS = "time: " + time + " | signature: " + signedHash;
-
-            //get client public key
-            FileInputStream fis01 = new FileInputStream("src/keys/" + username + "Pub.key");
-            byte[] encoded2 = new byte[fis01.available()];
-            fis01.read(encoded2);
-            fis01.close();
-            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
-            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
-            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
-
-            Cipher cipherReport = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            cipherReport.init(Cipher.ENCRYPT_MODE, pub);
-
-            Iterator i = reports.iterator();
-            while (i.hasNext()) {
-                Report r = (Report) i.next();
-
-                String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
-                r.setEpoch(-1);
-                r.setPosX(-1);
-                r.setPosY(-1);
-
-                byte[] infoBytes = Base64.getDecoder().decode(info);
-                byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
-                String loc = Base64.getEncoder().encodeToString(cipherBytes1);
-
-                r.setEncryptedInfo(loc);
-
-                //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
-                byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
-                String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
-
-                r.setWitness(loc3);
-            }
         }
         catch (NoSuchAlgorithmException e) {
             e.printStackTrace();

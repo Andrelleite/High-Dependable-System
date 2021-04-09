@@ -16,7 +16,7 @@ import java.util.List;
 
 public interface ServerInterface extends Remote, Serializable {
 
-    public void subscribe(ClientInterface c, String user) throws RemoteException;
+    public void subscribe(ClientInterface c, String user, String key) throws RemoteException;
     public String echo(String message) throws RemoteException;
     public String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException;
     public ServerReturn obtainLocationReport(ClientInterface c, String epoch,String username) throws IOException, ClassNotFoundException;
