@@ -13,8 +13,11 @@ public class Report implements Serializable {
     private String encryptedInfo;
     private String timeStamp;
     private String witnessTimeStamp;
+    private String witnessPos;
+    private int posXWitness;
+    private int posYWitness;
 
-    public Report(ClientInterface cl, int x, int y, int ep, String user,String userSignature,String timeStamp, String witness, String witnessSignature, String witnessTimeStamp){
+    public Report(ClientInterface cl, int x, int y, int ep, String user,String userSignature,String timeStamp, String witness, String witnessSignature, String witnessTimeStamp, String witnessPos){
         this.c = cl;
         this.posX = x;
         this.posY = y;
@@ -25,6 +28,7 @@ public class Report implements Serializable {
         this.witness = witness;
         this.witnessSignature = witnessSignature;
         this.witnessTimeStamp = witnessTimeStamp;
+        this.witnessPos = witnessPos;
     }
 
     public ClientInterface getC() {
@@ -99,5 +103,25 @@ public class Report implements Serializable {
 
     public void setWitness(String witness) {
         this.witness = witness;
+    }
+
+    public int getPosXWitness() {
+        return posXWitness;
+    }
+
+    public int getPosYWitness() {
+        return posYWitness;
+    }
+
+    public void setPosXWitness(int posXWitness) {
+        this.posXWitness = posXWitness;
+    }
+
+    public void setPosYWitness(int posYWitness) {
+        this.posYWitness = posYWitness;
+    }
+
+    public String getWitnessPos() {
+        return witnessPos;
     }
 }

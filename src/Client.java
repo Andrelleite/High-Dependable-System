@@ -102,7 +102,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             this.setCoordinate1(moveList.get(epoch).getFirst());
             this.setCoordinate2(moveList.get(epoch).getSecond());
             requestLocationProof();
-            getReports();
+            //getReports();
         }
     }
 
@@ -287,7 +287,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
                             String s = username + time + this.getUsername() + this.getEpoch();
 
-                            //get client private key
+                            //get witness private key
                             FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
                             byte[] encoded1 = new byte[fis0.available()];
                             fis0.read(encoded1);
@@ -303,15 +303,23 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             byte[] digestByte0 = digest0.digest();
                             String digest64 = Base64.getEncoder().encodeToString(digestByte0);
 
-                            //sign the hash with the client's private key
+                            //sign the hash with the witness' private key
                             Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                             cipherHash.init(Cipher.ENCRYPT_MODE, priv);
                             byte[] hashBytes = Base64.getDecoder().decode(digest64);
                             byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
                             String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
+                            Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                            cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
 
-                            Report userReport = new Report(c,-1,-1,this.epoch,username,"","",this.getUsername(),signedHash,time);
+                            String info = "posXq" + this.getCoordinate1() + "wposYq" + this.getCoordinate2();
+
+                            //byte[] infoBytes = Base64.getDecoder().decode(info);
+                            byte[] cipherBytes1 = cipherReport.doFinal(info.getBytes());
+                            String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                            Report userReport = new Report(c,-1,-1,userEpoch,username,"","",this.getUsername(),signedHash,time,loc);
                             return userReport;
                         }
                     }
@@ -362,9 +370,9 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             usersNearby.add(username);
                         }
 
-                        if (usersNearby.size() == 5){
+                        /*if (usersNearby.size() == 5){
                             return usersNearby;
-                        }
+                        }*/
                     }
                 } catch (NumberFormatException ex) { // handle your exception
                     System.out.println("Malformed input found!");
@@ -444,17 +452,20 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                 System.out.println(this.username + " trying to contact " + userToContact);
                 try {
                     ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + userToContact);
-                    message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.epoch);
+                    message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.getEpoch());
                     if(message == null){
+                        System.out.println("report is null");
                         return;
                     }
 
                     if(message.getC() != this.getClientInterface() && !message.getUsername().equals(this.getUsername()) && message.getEpoch() != this.epoch && !message.getWitness().equals(userToContact)){
+                        System.out.println("report don't pass");
                         return;
                     }
 
                     String verifyRet = verifyWitnessSignature(message, h);
                     if(verifyRet.equals(("Error"))){
+                        System.out.println("report witness signature is wrong");
                         return;
                     }
 
@@ -524,8 +535,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     String info = "posXq" + this.getCoordinate1() + "wposYq" + this.getCoordinate2() + "wepochq" + message.getEpoch();
                     message.setEpoch(-1);
 
-                    byte[] infoBytes = Base64.getDecoder().decode(info);
-                    byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                    //byte[] infoBytes = Base64.getDecoder().decode(info);
+                    byte[] cipherBytes1 = cipherReport.doFinal(info.getBytes());
                     String loc = Base64.getEncoder().encodeToString(cipherBytes1);
 
                     message.setEncryptedInfo(loc);

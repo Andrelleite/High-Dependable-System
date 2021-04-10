@@ -158,8 +158,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
             byte[] hashBytes1 = java.util.Base64.getDecoder().decode(locationReport.getEncryptedInfo());
             byte[] chunk = cipher.doFinal(hashBytes1);
-            String info = Base64.getEncoder().encodeToString(chunk);
-            info = info.split("=")[0];
+            String info = new String(chunk, UTF_8);
 
             locationReport.setPosX(Integer.parseInt(info.split("w")[0].split("q")[1]));
             locationReport.setPosY(Integer.parseInt(info.split("w")[1].split("q")[1]));
@@ -170,6 +169,16 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             String witness =  new String(chunk2, UTF_8);
 
             locationReport.setWitness(witness);
+
+            Cipher cipherWit = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipherWit.init(Cipher.DECRYPT_MODE, this.symKey.get(witness));
+
+            byte[] hashBytes2 = java.util.Base64.getDecoder().decode(locationReport.getWitnessPos());
+            byte[] chunkWit = cipherWit.doFinal(hashBytes2);
+            String info2 = new String(chunkWit, UTF_8);
+
+            locationReport.setPosXWitness(Integer.parseInt(info2.split("w")[0].split("q")[1]));
+            locationReport.setPosYWitness(Integer.parseInt(info2.split("w")[1].split("q")[1]));
 
         }
         catch (NoSuchAlgorithmException e) {
@@ -190,6 +199,17 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             e.printStackTrace();
         }
 
+        System.out.println("===============================================================================================");
+        System.out.println("RECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
+        //System.out.println("USER SIGNATURE: " + locationReport.getUserSignature());
+        //System.out.println("TIMESTAMP: " + locationReport.getTimeStamp());
+        System.out.println("POS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
+        System.out.println("WITNESS: " + locationReport.getWitness());
+        //System.out.println("WITNESS SIGNATURE: " + locationReport.getWitnessSignature());
+        //System.out.println("WITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
+        System.out.println("WITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
+        System.out.println("===============================================================================================");
+
 
 
 
@@ -203,6 +223,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             System.out.println("WITNESS: " + locationReport.getWitness());
             System.out.println("WITNESS SIGNATURE: " + locationReport.getWitnessSignature());
             System.out.println("WITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
+            System.out.println("WITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
             System.out.println("===============================================================================================");
 
             this.reps.add(locationReport);

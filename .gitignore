@@ -1,6 +1,5 @@
-
 *.class
-out/production/High-Dependable-System/grid/grid1.txt
+out/production
 .idea/uiDesigner.xml
 *.xml
 .idea/uiDesigner.xml

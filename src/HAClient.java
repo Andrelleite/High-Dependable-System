@@ -60,7 +60,7 @@ public class HAClient extends Thread{
                 System.out.println("No entries for that combination.");
             }
 
-        }catch (ConnectException | UnmarshalException e){
+        }catch (ConnectException | UnmarshalException | InterruptedException e){
             try {
                 this.h = null;
                 retry();
