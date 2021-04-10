@@ -80,11 +80,11 @@ public class Application {
                 if (client.getHasError() == 1) {
                     itr.remove();
                     clientsWithError.add(client.getUsername());
-                    try {
+                    /*try {
                         unbind("rmi://127.0.0.1:7001/" + client.getUsername());
                     } catch (RemoteException | NotBoundException | MalformedURLException e) {
                         e.printStackTrace();
-                    }
+                    }*/
                 }else{
                     client.setClientsWithError(clientsWithError);
                     client.setEpoch(epoch);
@@ -102,6 +102,7 @@ public class Application {
                 e.printStackTrace();
             }
             epoch += 1;
+            clientsWithError.clear();
 
         }
     }

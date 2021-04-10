@@ -278,8 +278,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         e.printStackTrace();
                     }
                 }
-
-                serverReturn[0] = "null";
+                if(serverReturn[0] == null)
+                    serverReturn[0] = "null";
             }
         };
         worker.start();
