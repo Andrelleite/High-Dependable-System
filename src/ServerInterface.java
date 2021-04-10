@@ -18,8 +18,8 @@ public interface ServerInterface extends Remote, Serializable {
 
     public void subscribe(ClientInterface c, String user, String key) throws RemoteException;
     public String echo(String message) throws RemoteException;
-    public String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException;
-    public ServerReturn obtainLocationReport(ClientInterface c, String epoch,String username) throws IOException, ClassNotFoundException;
+    public String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException, InterruptedException;
+    public ServerReturn obtainLocationReport(ClientInterface c, String epoch,String username) throws IOException, ClassNotFoundException, InterruptedException;
     public ServerReturn obtainLocationReport(String user, int epoch) throws IOException, ClassNotFoundException, InterruptedException;
     public ServerReturn obtainUsersAtLocation(int[] pos, int epoch) throws IOException, ClassNotFoundException, InterruptedException;
 
