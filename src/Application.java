@@ -90,6 +90,11 @@ public class Application {
                     client.setEpoch(epoch);
                 }
             }
+            Iterator<Client> itr1 = clientsList.iterator();
+            while (itr1.hasNext()) {
+                Client client = itr1.next();
+                client.setRequestLocationProof();
+            }
 
             try {
                 Thread.sleep(5000);

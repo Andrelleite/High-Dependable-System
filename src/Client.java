@@ -101,7 +101,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         if(moveList.containsKey(epoch)){
             this.setCoordinate1(moveList.get(epoch).getFirst());
             this.setCoordinate2(moveList.get(epoch).getSecond());
-            requestLocationProof();
+            //requestLocationProof();
             //getReports();
         }
     }
@@ -257,6 +257,12 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     }
 
+    public void setRequestLocationProof() throws InterruptedException, IOException, ClassNotFoundException {
+        requestLocationProof();
+    }
+
+    //=============================================================================================================
+
     public Report generateLocationReportWitness(ClientInterface c, String username, int userEpoch) throws RemoteException{
         try {
             File myObj = new File("src/grid/grid1.txt");
@@ -285,7 +291,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             //Get time
                             String time = java.time.LocalTime.now().toString();
 
-                            String s = username + time + this.getUsername() + this.getEpoch();
+                            String s = username + time + this.getUsername() + userEpoch; //+ this.getCoordinate1() + this.getCoordinate2();
 
                             //get witness private key
                             FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
@@ -692,6 +698,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         } */catch (BadPaddingException e) {
             e.printStackTrace();
         } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
