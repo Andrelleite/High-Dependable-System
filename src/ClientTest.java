@@ -55,7 +55,7 @@ public class ClientTest extends UnicastRemoteObject implements ClientInterface {
                 server.subscribe(this,user,"");
                 server.submitLocationReport(this,user,n);
 
-                ServerReturn s = server.obtainLocationReport("user1",0);
+                ServerReturn s = server.obtainLocationReport("user1","0");
                 System.out.println("bruhhhh + " + s.getServerProof());
                 ArrayList<Report> reports = s.getReports();
                 if(reports != null){

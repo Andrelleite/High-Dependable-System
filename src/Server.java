@@ -448,14 +448,32 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================AUTHORITY-METHODS==========================================================================
 
-    public ServerReturn obtainLocationReport(String user, int epoch) throws InterruptedException {
+    public ServerReturn obtainLocationReport(String user, String epoch) throws InterruptedException {
 
+        int[] ep = {-1};
         ServerReturn[] serverReturn = new ServerReturn[1];
         ArrayList<Report> reps = this.reps;
+        HashMap<String,SecretKey> symKey = this.symKey;
 
         Thread worker = new Thread("Worker"){
             @Override
             public void run(){
+
+                try {
+                    Cipher cipher = null;
+                    cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                    cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
+
+                    byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
+                    byte[] chunk2 = cipher.doFinal(hashBytes3);
+                    String parse =  new String(chunk2, UTF_8);
+
+                    ep[0] = Integer.parseInt(parse);
+                } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException e) {
+                    e.printStackTrace();
+                }
+
+
                 System.out.println("_______________________________________________________________________");
                 System.out.println("LOCATION REPORTS REGARDING "+user+" REQUEST BY HA");
                 System.out.println("BIG BROTHER IS REQUESTING");
@@ -464,7 +482,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     if(!clientReports.get(i).getUsername().toUpperCase().equals(user.toUpperCase())){
                         clientReports.remove(i);
                         i--;
-                    }else if(clientReports.get(i).getEpoch() != epoch){
+                    }else if(clientReports.get(i).getEpoch() != ep[0]){
                         clientReports.remove(i);
                         i--;
                     }
@@ -480,6 +498,33 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 String finalS = "";
 
                 try {
+
+                    Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(user));
+
+                    Iterator i = clientReports.iterator();
+                    while (i.hasNext()) {
+                        Report r = (Report) i.next();
+
+                        String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+                        r.setEpoch(-1);
+                        r.setPosX(-1);
+                        r.setPosY(-1);
+
+                        byte[] infoBytes = Base64.getDecoder().decode(info);
+                        byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                        String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                        r.setEncryptedInfo(loc);
+
+                        //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                        byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
+                        String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+                        r.setWitness(loc3);
+                    }
+
+
                     //get client private key
                     FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                     byte[] encoded1 = new byte[fis0.available()];
@@ -531,28 +576,59 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn[0];
     }
 
-    public ServerReturn obtainUsersAtLocation(int[] pos, int epoch) throws InterruptedException{
+    public ServerReturn obtainUsersAtLocation(String user, String pos, String epoch) throws InterruptedException{
 
+        int[] ep = {-1};
+        int[] posi = {-1, -1};
         ServerReturn[] serverReturn = new ServerReturn[1];
         ArrayList<Report> reps = this.reps;
+        HashMap<String,SecretKey> symKey = this.symKey;
+        String[] positionDec = new String[2];
 
         Thread worker = new Thread("Worker"){
             @Override
             public void run() {
+
+                try {
+                    Cipher cipher = null;
+                    cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                    cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
+
+                    byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
+                    byte[] chunk2 = cipher.doFinal(hashBytes3);
+                    String parse =  new String(chunk2, UTF_8);
+
+                    ep[0] = Integer.parseInt(parse);
+
+                    byte[] hashBytes4 = java.util.Base64.getDecoder().decode(epoch);
+                    byte[] chunk3 = cipher.doFinal(hashBytes4);
+                    String position =  new String(chunk3, UTF_8);
+
+                    positionDec[0] = position.split(",")[0];
+                    positionDec[1] = position.split(",")[1];
+
+                    posi[0] = Integer.parseInt(positionDec[0]);
+                    posi[1] = Integer.parseInt(positionDec[1]);
+
+                } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException e) {
+                    e.printStackTrace();
+                }
+
+
                 System.out.println("_______________________________________________________________________");
-                System.out.println("ALL LOCATION REPORTS FOR POSITION ("+pos[0]+","+pos[1]+") AT EPOCH "+epoch+" REQUEST BY HA");
+                System.out.println("ALL LOCATION REPORTS FOR POSITION ("+ positionDec[0] +","+ positionDec[1] +") AT EPOCH "+ep[0]+" REQUEST BY HA");
                 System.out.println("BIG BROTHER IS REQUESTING");
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 for(int i = 0; i < clientReports.size();i++){
-                    if(clientReports.get(i).getPosY() != pos[1]){
-                        if(clientReports.get(i).getPosX() != pos[0]) {
+                    if(clientReports.get(i).getPosY() != posi[1]){
+                        if(clientReports.get(i).getPosX() != posi[0]) {
                             clientReports.remove(i);
                             i--;
                         }
-                    }else if(clientReports.get(i).getPosX() != pos[0]){
+                    }else if(clientReports.get(i).getPosX() != posi[0]){
                         clientReports.remove(i);
                         i--;
-                    }else if(clientReports.get(i).getEpoch() != epoch){
+                    }else if(clientReports.get(i).getEpoch() != ep[0]){
                         clientReports.remove(i);
                         i--;
                     }
@@ -564,11 +640,38 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 //Get time
                 String time = java.time.LocalTime.now().toString();
 
-                String s1 = "ha" + pos[0] + pos[1] + time + epoch;
+                String s1 = "ha" + posi[0] + posi[1] + time + ep[0];
 
                 String finalS = "";
 
                 try {
+
+                    Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(user));
+
+                    Iterator i = clientReports.iterator();
+                    while (i.hasNext()) {
+                        Report r = (Report) i.next();
+
+                        String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+                        r.setEpoch(-1);
+                        r.setPosX(-1);
+                        r.setPosY(-1);
+
+                        byte[] infoBytes = Base64.getDecoder().decode(info);
+                        byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                        String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                        r.setEncryptedInfo(loc);
+
+                        //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                        byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
+                        String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+                        r.setWitness(loc3);
+                    }
+
+
                     //get client private key
                     FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                     byte[] encoded1 = new byte[fis0.available()];

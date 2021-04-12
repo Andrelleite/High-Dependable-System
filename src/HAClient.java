@@ -38,7 +38,7 @@ public class HAClient extends Thread{
         try {
             /* All users location report at specific epochs *test* */
             System.out.println("$$$ USERS AT: ("+10+","+20+") IN EPOCH"+2+" $$$");
-            reports = (ArrayList<Report>) h.obtainUsersAtLocation(new int[]{10,20},2).getReports();
+            reports = (ArrayList<Report>) h.obtainUsersAtLocation("hauser", "10,20","2").getReports();
             if(reports != null){
                 for(int i = 0; i < reports.size(); i++){
                     System.out.println("\tENTRY "+(i+1)+": "+reports.get(i).getUsername());
@@ -49,7 +49,7 @@ public class HAClient extends Thread{
 
             /* Specific user report at specific epochs *test* */
             System.out.println("$$$ LOCATIONS OF USER: "+"user1"+" $$$");
-            reports = (ArrayList<Report>) h.obtainLocationReport("user1",2).getReports();
+            reports = (ArrayList<Report>) h.obtainLocationReport("user1","2").getReports();
             if(reports != null){
                 for(int i = 0; i < reports.size(); i++){
                     System.out.println("\tENTRY "+(i+1)+": "+
