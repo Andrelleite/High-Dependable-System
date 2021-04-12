@@ -28,10 +28,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private boolean imPrimary;
     private String IPV4;
     private int portRMI;
+    private int f;
 
     //=======================CONNECTION=================================================================================
 
-    public Server() throws IOException, NotBoundException, ClassNotFoundException {
+    public Server(int f) throws IOException, NotBoundException, ClassNotFoundException {
+        this.f = f;
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
         this.symKey = new HashMap<>();
@@ -60,7 +62,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         System.out.println("I'm in.");
     }
 
-    private ServerInterface retryConnection(int port) throws NotBoundException, IOException {
+    private ServerInterface retryConnection(int port) throws IOException {
 
         ServerInterface serverInt = null;
         Server server = this;
@@ -74,12 +76,27 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         } catch (ExportException ex) {
             imPrimary = false;
             System.out.println("I'm the backup");
-            serverInt = (ServerInterface) Naming.lookup("rmi://"+this.IPV4+":" + port + "/SERVER");
-            System.out.println("Connetion to primary succeded...");
+            try {
+                serverInt = (ServerInterface) Naming.lookup("rmi://"+this.IPV4+":" + port + "/SERVER");
+                System.out.println("Connetion to primary succeded...");
+            } catch (NotBoundException e) {
+                try {
+                    LocateRegistry.createRegistry(port);
+                }catch (ExportException s){
+                    LocateRegistry.getRegistry(port);
+                }
+                Naming.rebind("rmi://"+this.IPV4+":" + port + "/SERVER", server);
+                imPrimary = true;
+                System.out.println("I'm the primary");
+            }
         }
-
         System.out.println("Server ready...");
         return serverInt;
+    }
+
+    public int shutdown() throws MalformedURLException, NotBoundException, RemoteException {
+        Naming.unbind("rmi://"+this.IPV4+":" + portRMI + "/SERVER");
+        return 1;
     }
 
     //=======================SERVER-SYS=================================================================================
@@ -474,9 +491,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 }
 
 
-                System.out.println("_______________________________________________________________________");
+                /*System.out.println("_______________________________________________________________________");
                 System.out.println("LOCATION REPORTS REGARDING "+user+" REQUEST BY HA");
-                System.out.println("BIG BROTHER IS REQUESTING");
+                System.out.println("BIG BROTHER IS REQUESTING");*/
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 for(int i = 0; i < clientReports.size();i++){
                     if(!clientReports.get(i).getUsername().toUpperCase().equals(user.toUpperCase())){
@@ -487,8 +504,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         i--;
                     }
                 }
-                System.out.println("REQUEST SIZE "+clientReports.size());
-                System.out.println("REQUEST COMPLETE");
+                cleanRepetition(clientReports,1);
+                /*System.out.println("REQUEST SIZE "+clientReports.size());
+                System.out.println("REQUEST COMPLETE");*/
 
                 //Get time
                 String time = java.time.LocalTime.now().toString();
@@ -615,9 +633,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 }
 
 
-                System.out.println("_______________________________________________________________________");
+                /*System.out.println("_______________________________________________________________________");
                 System.out.println("ALL LOCATION REPORTS FOR POSITION ("+ positionDec[0] +","+ positionDec[1] +") AT EPOCH "+ep[0]+" REQUEST BY HA");
-                System.out.println("BIG BROTHER IS REQUESTING");
+                System.out.println("BIG BROTHER IS REQUESTING");*/
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 for(int i = 0; i < clientReports.size();i++){
                     if(clientReports.get(i).getPosY() != posi[1]){
@@ -634,8 +652,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     }
                 }
                 cleanRepetition(clientReports,0);
-                System.out.println("REQUEST SIZE "+clientReports.size());
-                System.out.println("REQUEST COMPLETE");
+                /*System.out.println("REQUEST SIZE "+clientReports.size());
+                System.out.println("REQUEST COMPLETE");*/
 
                 //Get time
                 String time = java.time.LocalTime.now().toString();
@@ -751,6 +769,19 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     if(list.get(i).getUsername().equals(list.get(j).getUsername())){
                         list.remove(j);
                         j--;
+                    }
+                }
+            }
+        }else if(op == 1){
+            for (int i = 0; i < list.size(); i++) {
+                for(int j = i+1; j < list.size(); j++){
+                    if(list.get(i).getUsername().equals(list.get(j).getUsername())){
+                        if(list.get(i).getPosX() == list.get(j).getPosX()){
+                            if(list.get(i).getPosY() == list.get(j).getPosY()){
+                                list.remove(j);
+                                j--;
+                            }
+                        }
                     }
                 }
             }
@@ -956,7 +987,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public static void main(String args[]) {
         try {
-            Server server = new Server();
+            Server server = new Server(5);
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         } catch (NotBoundException e) {

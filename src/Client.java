@@ -46,9 +46,9 @@ class Pair<A, B> {
 }
 
 public class Client extends UnicastRemoteObject implements ClientInterface, Runnable{
+
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
-
     private String username;
     private ClientInterface clientInterface;
     private int coordinate1;
@@ -254,7 +254,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             e.printStackTrace();
 
         }
-
+        System.out.println(this.moveList);
     }
 
     public void setRequestLocationProof() throws InterruptedException, IOException, ClassNotFoundException {
@@ -596,12 +596,10 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     }
 
-    public void getReports() throws RemoteException{
+    public void getReports(String ep) throws RemoteException{
 
         try {
             ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-
-            String epoch = ""+this.epoch;
 
             //get server public key
             /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
@@ -618,7 +616,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
             cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
 
-            byte[] cipherBytes3 = cipherReport.doFinal(epoch.getBytes());
+            byte[] cipherBytes3 = cipherReport.doFinal(ep.getBytes());
             String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
 
             ServerReturn r = s.obtainLocationReport(this.getClientInterface(),loc3,this.getUsername());
@@ -667,7 +665,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
                 re.setWitness(witness);
 
-                System.out.println("===============================================================================================");
+                System.out.println("==================ZECA=============================================");
                 System.out.println("RECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername());
                 System.out.println("USER SIGNATURE: " + re.getUserSignature());
                 System.out.println("TIMESTAMP: " + re.getTimeStamp());
@@ -680,7 +678,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             }
 
         } catch (NotBoundException e) {
-            e.printStackTrace();
+            System.out.println();
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (IOException e) {
