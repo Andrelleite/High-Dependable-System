@@ -71,6 +71,8 @@ This instructions are different for pratical reasons and we will define them for
 4. **ha,user[x],[epoch]** : Health Authority generates a request for location proof of user[x] at epoch [epoch];
 5. **ha,position,x,y,[epoch]** : Health Authority generates a request for all location proof located at (x,y) at the instance [epoch];
 6. **server,[down|up]** : Simulates Server crash or forced drop. **down** simulates the connection fault, **up** reconnects the server;
+7. **spy,registry,user[x],user[y]** : TO BE DETERMINED
+8. **spy,reports,user[x],user[y]** : TO BE DETERMINED
 
 
 ## Running Files
