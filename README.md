@@ -2,11 +2,34 @@
 
 ## Instructions
 
+
 For pratical purposes, there will be set in folder a executable for running the whole application.
-It is important to know that the file simulate.txt will set the behaviour of this application.
 
-You can change this behaviour following this form:
+Firstly there is defined the file **grid.txt**, where all moves are depicted. This files sets the first epoch and last, as well as the locations for each client at each of these epochs.
+This file follows a simple type of definitions, such as the next example:
 
+```
+user2, 0, 30, 30
+user3, 0, 10, 15
+user4, 0, 30, 37
+user5, 0, 30, 37
+user6, 0, 30, 37
+user7, 0, 30, 37
+user8, 0, 30, 37
+user9, 0, 30, 37
+user1, 1, 10, 20
+user2, 1, 30, 30
+user3, 1, 10, 15
+user4, 1, 30, 37
+user5, 1, 30, 37
+user1, 2, 10, 20
+user2, 2, 30, 30
+user3, 2, 10, 15
+user4, 2, 30, 37
+```
+
+It is important to know that the file **simulate.txt** will set the behaviour of this application.
+You can change this behaviour following this file type of construct.
 In the beggining of the file should always be set as follows:
 
 ```
