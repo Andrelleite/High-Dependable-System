@@ -45,12 +45,12 @@ endsim
 
 Following this lines, should be set the instructions for runtime.
 This instructions are different for pratical reasons and we will define them for the following lines:
-1. generateproof,[epoch] : To generate the proofs of location for all the clients in the system. Epoch should be defined between 1 and the last epoch defined in the grid.txt;
-2. fake,[epoch],user[x],user[y] : To try to fake a proof, where user[x] will try to fake his identity as user[y];
-3. user[x],request,[epoch] : User request of his location proofs at epoch [epoch];
-4. ha,user[x],[epoch] : Health Authority generates a request for location proof of user[x] at epoch [epoch];
-5. ha,position,x,y,[epoch] : Health Authority generates a request for all location proof located at (x,y) at the instance [epoch];
-6. server,[down|up] : Simulates Server crash or forced drop. **down** simulates the connection fault, **up** reconnects the server;
+1. **generateproof,[epoch]** : To generate the proofs of location for all the clients in the system. Epoch should be defined between 1 and the last epoch defined in the grid.txt;
+2. **fake,[epoch],user[x],user[y]** : To try to fake a proof, where user[x] will try to fake his identity as user[y];
+3. **user[x],request,[epoch]** : User request of his location proofs at epoch [epoch];
+4. **ha,user[x],[epoch]** : Health Authority generates a request for location proof of user[x] at epoch [epoch];
+5. **ha,position,x,y,[epoch]** : Health Authority generates a request for all location proof located at (x,y) at the instance [epoch];
+6. **server,[down|up]** : Simulates Server crash or forced drop. **down** simulates the connection fault, **up** reconnects the server;
 
 
 
