@@ -2,9 +2,6 @@
 
 ## Test files Setup
 
-
-For pratical purposes, there will be set in folder a executable for running the whole application.
-
 Firstly there is defined the file **grid.txt**, where all moves are depicted. This files sets the first epoch and last, as well as the locations for each client at each of these epochs.
 This file follows a simple type of definitions, such as the next example:
 
