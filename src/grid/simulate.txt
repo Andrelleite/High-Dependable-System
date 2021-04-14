@@ -5,11 +5,8 @@ user2,b
 user4,b
 setupclients
 generateproofs,0
-fake,0,user4,user1
-generateproofs,1
-user3,request,1
-generateproofs,2
-user4,request,2
+user5,request,0
+user2,request,0
 ha,position,10,20,0
 ha,user2,0
 endsim

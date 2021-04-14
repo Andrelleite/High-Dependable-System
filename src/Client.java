@@ -58,6 +58,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     private int hasError = 0;
     private Map<Integer, Pair<Integer,Integer>> moveList = new HashMap<Integer, Pair<Integer,Integer>>();
     private List<String> clientsWithError = new ArrayList<String>();
+    private OutputManager fileMan;
 
     public Map<Integer, Pair<Integer, Integer>> getMoveList() {
         return moveList;
@@ -133,9 +134,14 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         return username;
     }
 
-    public void setUsername(String username) {
+    public void setUsername(String username){
         this.username = username;
-
+        this.fileMan = new OutputManager(this.username,this.username);
+        try {
+            this.fileMan.initFile();
+        } catch (FileNotFoundException | UnsupportedEncodingException e) {
+            e.printStackTrace();
+        }
         // REPORT SUBMISSION
         try{
             ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
@@ -199,6 +205,11 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         } catch (IllegalBlockSizeException e) {
             e.printStackTrace();
         }
+    }
+
+    public void setUsername(String username,String origin){
+        this.username = username;
+
     }
 
     public Client() throws RemoteException {
@@ -776,20 +787,12 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                 System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA (GET REPORTS)");
             }
 
+            this.fileMan.appendInformation(" [REQUEST TO SERVER]  MY REPORTS");
+            int j = 0;
             Iterator i = r.getReports().iterator();
             while (i.hasNext()) {
 
                 Report re = (Report) i.next();
-
-                /*System.out.println("===============================================================================================");
-                System.out.println("RECEIVED THE SERVER PROOF0 OF LOCATION FROM - "+ re.getUsername());
-                System.out.println("USER SIGNATURE: " + re.getUserSignature());
-                System.out.println("TIMESTAMP: " + re.getTimeStamp());
-                System.out.println("POS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
-                System.out.println("WITNESS: " + re.getWitness());
-                System.out.println("WITNESS SIGNATURE: " + re.getWitnessSignature());
-                System.out.println("WITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
-                System.out.println("===============================================================================================");*/
 
                 byte[] hashBytes1 = java.util.Base64.getDecoder().decode(re.getEncryptedInfo());
                 byte[] chunk = rsaCipher.doFinal(hashBytes1);
@@ -806,15 +809,14 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
                 re.setWitness(witness);
 
-                System.out.println("==================ZECA=============================================");
-                System.out.println("RECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername());
-                System.out.println("USER SIGNATURE: " + re.getUserSignature());
-                System.out.println("TIMESTAMP: " + re.getTimeStamp());
-                System.out.println("POS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
-                System.out.println("WITNESS: " + re.getWitness());
-                System.out.println("WITNESS SIGNATURE: " + re.getWitnessSignature());
-                System.out.println("WITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
-                System.out.println("===============================================================================================");
+                j++;
+                this.fileMan.appendInformation("\t\t ====== REPORT #"+j);
+                this.fileMan.appendInformation("\t\t\tRECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername());
+                this.fileMan.appendInformation("\t\t\tUSER SIGNATURE: " + re.getUserSignature() + "TIMESTAMP: " + re.getTimeStamp());
+                this.fileMan.appendInformation("\t\t\tPOS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
+                this.fileMan.appendInformation("\t\t\tWITNESS: " + re.getWitness());
+                this.fileMan.appendInformation("\t\t\tWITNESS SIGNATURE: " + re.getWitnessSignature());
+                this.fileMan.appendInformation("\t\t\tWITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
 
             }
 

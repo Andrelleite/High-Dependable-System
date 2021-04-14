@@ -22,8 +22,5 @@ public class Byzantine extends Client{
         super();
     }
 
-    public void fakeIdentity(String user, String original){
-        this.setUsername(user);
-    }
 
 }

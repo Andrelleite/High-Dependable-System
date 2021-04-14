@@ -161,9 +161,9 @@ class Simulation{
         for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
             if(this.byzantines.get(i).getUsername().equals(username)){
                 original = this.byzantines.get(i).getUsername();
-                this.byzantines.get(i).fakeIdentity(target,original);
+                this.byzantines.get(i).setUsername(target,original);
                 this.byzantines.get(i).setRequestLocationProof();
-                this.byzantines.get(i).fakeIdentity(original,original);
+                this.byzantines.get(i).setUsername(original,original);
                 flag = 1;
             }
         }
@@ -176,9 +176,9 @@ class Simulation{
         for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
             if(this.byzantines.get(i).getUsername().equals(byz)){
                 original = this.byzantines.get(i).getUsername();
-                this.byzantines.get(i).fakeIdentity(victim,original);
+                this.byzantines.get(i).setUsername(victim,original);
                 this.byzantines.get(i).getReports(epoch);
-                this.byzantines.get(i).fakeIdentity(original,original);
+                this.byzantines.get(i).setUsername(original,original);
                 flag = 1;
             }
         }

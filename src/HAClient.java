@@ -130,7 +130,7 @@ public class HAClient extends Thread{
 
                 reports = s.getReports();
 
-                this.fileMan.appendInformation("\t\t\tSERVER RETURN: " + s.getServerProof());
+                this.fileMan.appendInformation("\t\tSERVER RETURN: " + s.getServerProof());
 
                 if(reports != null){
 
@@ -162,12 +162,12 @@ public class HAClient extends Thread{
                         String username =  new String(chunk3, UTF_8);
 
                         re.setUsername(username);
-                        this.fileMan.appendInformation("\tENTRY "+": "+re.getUsername());
+                        this.fileMan.appendInformation("\t\t\tENTRY "+": "+re.getUsername());
 
                     }
 
                 }else{
-                    this.fileMan.appendInformation("No entries for that combination.");
+                    this.fileMan.appendInformation("\t\t\tNo entries for that combination.");
                 }
             }else if(op == 2){
                 /* Specific user report at specific epochs *test* */
@@ -186,11 +186,12 @@ public class HAClient extends Thread{
 
                 reports = s.getReports();
 
-                this.fileMan.appendInformation("SERVER RETURN: " + s.getServerProof());
+                this.fileMan.appendInformation("\t\tSERVER RETURN: " + s.getServerProof());
 
                 Cipher rsaCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 rsaCipher.init(Cipher.DECRYPT_MODE, this.getSymKey());
 
+                int j = 0;
                 Iterator i = reports.iterator();
                 while (i.hasNext()) {
 
@@ -216,11 +217,15 @@ public class HAClient extends Thread{
                     String username =  new String(chunk3, UTF_8);
 
                     re.setUsername(username);*/
-                    this.fileMan.appendInformation("\t\t\tRECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername()+
-                            "\n\t\t\tUSER SIGNATURE: " + re.getUserSignature() + "TIMESTAMP: " + re.getTimeStamp() +
-                            "\n\t\tPOS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch() +
-                            "\n\t\t\tWITNESS: " + re.getWitness() + "WITNESS SIGNATURE: " + re.getWitnessSignature() +
-                            "\n\t\t\tWITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
+
+                    j++;
+                    this.fileMan.appendInformation("\t\t ====== REPORT #"+j);
+                    this.fileMan.appendInformation("\t\t\tRECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername());
+                    this.fileMan.appendInformation("\t\t\tUSER SIGNATURE: " + re.getUserSignature() + "TIMESTAMP: " + re.getTimeStamp());
+                    this.fileMan.appendInformation("\t\t\tPOS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
+                    this.fileMan.appendInformation("\t\t\tWITNESS: " + re.getWitness());
+                    this.fileMan.appendInformation("\t\t\tWITNESS SIGNATURE: " + re.getWitnessSignature());
+                    this.fileMan.appendInformation("\t\t\tWITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
 
                 }
 

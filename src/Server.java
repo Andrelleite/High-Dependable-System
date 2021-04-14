@@ -20,7 +20,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class Server extends UnicastRemoteObject implements ServerInterface, Serializable, Runnable{
+public class Server extends UnicastRemoteObject implements ServerInterface, Serializable{
 
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
@@ -234,6 +234,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         String[] serverReturn = new String[1];
         ArrayList<Report> reps = this.reps;
         HashMap<String,SecretKey> symKey = this.symKey;
+        OutputManager filer = this.fileMan;
 
         Thread worker = new Thread("Worker") {
             @Override
@@ -281,49 +282,29 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                 }
                 catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                } /*catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeySpecException e) {
-                    e.printStackTrace();
-                } */catch (NoSuchPaddingException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR1");
+                } catch (NoSuchPaddingException e) {
+                    filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR2");
                 } catch (InvalidKeyException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR3");
                 } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR4");
                 } catch (BadPaddingException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR5");
                 }
 
-                System.out.println("===============================================================================================");
-                System.out.println("RECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
-                //System.out.println("USER SIGNATURE: " + locationReport.getUserSignature());
-                //System.out.println("TIMESTAMP: " + locationReport.getTimeStamp());
-                System.out.println("POS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
-                System.out.println("WITNESS: " + locationReport.getWitness());
-                //System.out.println("WITNESS SIGNATURE: " + locationReport.getWitnessSignature());
-                //System.out.println("WITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
-                System.out.println("WITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
-                System.out.println("===============================================================================================");
-
-
-
+                filer.appendInformation("[PROOF REQUEST] "+user+" SUBMITING NEW LOCATION PROOF AT EPOCH "+locationReport.getEpoch()+" ===== ");
 
                 String verifyRet = verifyLocationReport(c, user, locationReport);
                 if(verifyRet.equals("Correct") /*&& !checkClone(locationReport)*/){
-                    System.out.println("===============================================================================================");
-                    System.out.println("RECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
-                    System.out.println("USER SIGNATURE: " + locationReport.getUserSignature());
-                    System.out.println("TIMESTAMP: " + locationReport.getTimeStamp());
-                    System.out.println("POS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
-                    System.out.println("WITNESS: " + locationReport.getWitness());
-                    System.out.println("WITNESS SIGNATURE: " + locationReport.getWitnessSignature());
-                    System.out.println("WITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
-                    System.out.println("WITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
-                    System.out.println("===============================================================================================");
+                    filer.appendInformation("\t\t\tRECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
+                    filer.appendInformation("\t\t\tUSER SIGNATURE: " + locationReport.getUserSignature());
+                    filer.appendInformation("\t\t\tTIMESTAMP: " + locationReport.getTimeStamp());
+                    filer.appendInformation("\t\t\tPOS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
+                    filer.appendInformation("\t\t\tWITNESS: " + locationReport.getWitness());
+                    filer.appendInformation("\t\t\tWITNESS SIGNATURE: " + locationReport.getWitnessSignature());
+                    filer.appendInformation("\t\t\tWITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
+                    filer.appendInformation("\t\t\tWITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
 
                     reps.add(locationReport);
                     try {
@@ -364,16 +345,19 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
                         serverReturn[0] = "time: " + time + " | signature: " + signedHash;
+                        filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
+                        filer.appendInformation("\t\t SIGNATURE: " + signedHash);
 
 
                     } catch (IOException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException e) {
-                        e.printStackTrace();
-                        System.out.println("Things went sideways :(");
+                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR6");
                     } catch (BadPaddingException e) {
-                        e.printStackTrace();
+                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR7");
                     } catch (IllegalBlockSizeException e) {
-                        e.printStackTrace();
+                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR8");
                     }
+                }else{
+                    filer.appendInformation("\t\t\tREQUEST FOR LOCATION PROOF DENIED.");
                 }
                 if(serverReturn[0] == null)
                     serverReturn[0] = "null";
@@ -392,10 +376,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         ServerReturn[] serverReturn = new ServerReturn[1];
         ArrayList<Report> reps = this.reps;
         HashMap<String,SecretKey> symKey = this.symKey;
+        OutputManager filer = this.fileMan;
 
         Thread worker = new Thread("Worker") {
             @Override
             public void run() {
+                filer.appendInformation("[REPORT REQUEST] NEW REPORT DELIVERY REQUEST =====");
                 try{
                     //get server private key
                     /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
@@ -422,21 +408,15 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                 }
                 catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                }/* catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeySpecException e) {
-                    e.printStackTrace();
-                } */catch (NoSuchPaddingException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR1");
+                }catch (NoSuchPaddingException e) {
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR2");
                 } catch (InvalidKeyException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR3");
                 } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR4");
                 } catch (BadPaddingException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR5");
                 }
 
                 ArrayList<Report> reports = null;
@@ -457,6 +437,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 try {
                     Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                     cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(username));
+                    filer.appendInformation("===== NEW REPORT DELIVERY REQUEST FROM "+username+" =====");
 
 
                     Iterator i = reports.iterator();
@@ -515,20 +496,23 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
                     finalS = "time: " + time + " | signature: " + signedHash;
+                    filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
+                    filer.appendInformation("\t\t SIGNATURE: " + signedHash);
                 }
                 catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR6");
                 } catch (InvalidKeyException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR7");
                 } catch (NoSuchPaddingException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR8");
                 } catch (BadPaddingException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR9");
                 } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
+                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR10");
                 }
 
                 serverReturn[0] = new ServerReturn(finalS,returnReport);
+                filer.appendInformation("\t\t\t REQUEST COMPLETE FOR "+username);
 
             }
         };
@@ -577,7 +561,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 System.out.println("bruh ->> " + ep[0] + " " + userFinal );
 
 
-                filer.appendInformation("===== HA REQUESTING "+userFinal+" LOCATION REPORTS AT EPOCH ===== "+epochFinal);
+                filer.appendInformation("[HA USER REQUEST] HA REQUESTING "+userFinal+" LOCATION REPORTS AT EPOCH "+epochFinal+" ===== ");
 
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 System.out.println("->>>>"+clientReports.size());
@@ -592,7 +576,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     }
                 }
                 cleanRepetition(clientReports,1);
-                filer.appendInformation("\t\t\tREQUEST SIZE :"+clientReports.size()+"\n\t\t\t\tREQUEST COMPLETE");
+                filer.appendInformation("\t\t\tREQUEST SIZE :"+clientReports.size());
+                filer.appendInformation("\t\t\tREQUEST COMPLETE");
 
                 //Get time
                 String time = java.time.LocalTime.now().toString();
@@ -730,7 +715,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     e.printStackTrace();
                 }
 
-                filer.appendInformation("===== HA REQUESTING LOCATION REPORTS FOR POSITION ("+ positionDec[0] +","+ positionDec[1] +") AT EPOCH "+ep[0]+" =====");
+                filer.appendInformation("[HA LOCATION REQUEST] HA REQUESTING LOCATION REPORTS FOR POSITION ("+ positionDec[0] +","+ positionDec[1] +") AT EPOCH "+ep[0]+" =====");
 
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 for(int i = 0; i < clientReports.size();i++){
@@ -746,7 +731,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     }
                 }
                 cleanRepetition(clientReports,0);
-                filer.appendInformation("\t\t\tREQUEST SIZE :"+clientReports.size()+"\n\t\t\t\tREQUEST COMPLETE");
+                filer.appendInformation("\t\t\tREQUEST SIZE :"+clientReports.size());
+                filer.appendInformation("\t\t\tREQUEST COMPLETE");
+
 
                 //Get time
                 String time = java.time.LocalTime.now().toString();
@@ -969,16 +956,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return clientReports;
     }
 
-//==========================VERIFY DATA=============================================================================
-
-    @Override
-    /**
-     * Run Evaluator Thread
-     */
-    public void run() {
-       
-    }
-    
+    //==========================VERIFY DATA=============================================================================
 
     private String verifyLocationReport(ClientInterface c,String user, Report locationReport) {
         //witness signature
