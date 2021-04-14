@@ -450,6 +450,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
         ArrayList<String> usersToContact = findUser();
         Report message = null;
+        String serverSignature = "";
 
         if(usersToContact.size() != 0){
             Iterator i = usersToContact.iterator();
@@ -560,11 +561,11 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     // REPORT SUBMISSION
                     try{
                         ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-                        String serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
+                        serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
                         System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                     } catch (ConnectException ev){
                         try {
-                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
                             System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                         } catch (InterruptedException | IOException | NotBoundException interruptedException) {
                             System.out.println("SERVICE IS DOWN. COME BACK LATER.");
@@ -572,15 +573,51 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         }
                     } catch (RemoteException | MalformedURLException | NotBoundException e){
                         try {
-                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
                             System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                         } catch (ConnectException ev){
-                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
                             System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                         } catch (InterruptedException | IOException | NotBoundException interruptedException) {
                             System.out.println("SERVICE IS DOWN. COME BACK LATER.");
                             return;
                         }
+                    }
+
+                    if(serverSignature.equals("")){
+                        System.out.println("SOMETHING WRONG HAPPENED, NO RETURN FROM THE SERVER");
+                    }else if(serverSignature.equals("null")){
+                        System.out.println("SOMETHING WRONG HAPPENED, RETURN NOT SIGNED");
+                    }else {
+                        String timeServer = serverSignature.split(" ")[1];
+
+                        try{
+                            LocalTime signServerTime = LocalTime.parse(timeServer);
+                            LocalTime timeNow = LocalTime.now();
+                            //4 segundos para possíveis atrasos na rede
+                            LocalTime timeNowThreshold = timeNow.plusSeconds(4);
+                            if(timeNowThreshold.compareTo(signServerTime) < 0){
+                                System.out.println("Possilble replay attack");
+                                return;
+                            }
+                        }
+                        catch (DateTimeParseException e) {
+                            System.out.println("Malformed Return");
+                            e.printStackTrace();
+                        }
+
+                        String signServerHash = serverSignature.split(" ")[4];
+
+                        String stringTohash = this.username + timeServer + this.getEpoch();
+
+                        String verifySignRet = verifyServerSign(signServerHash, stringTohash);
+
+                        if(verifySignRet.equals("Correct")){
+                            //System.out.println("CORRECT SERVER SIGNATURE");
+                        }else {
+                            System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA");
+                        }
+
                     }
 
                 } catch (Exception e) {
@@ -636,6 +673,38 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
             Cipher rsaCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, this.getSymKey());
+
+            String serverSignature = r.getServerProof();
+
+            String timeServer = serverSignature.split(" ")[1];
+
+            try{
+                LocalTime signServerTime = LocalTime.parse(timeServer);
+                LocalTime timeNow = LocalTime.now();
+                //4 segundos para possíveis atrasos na rede
+                LocalTime timeNowThreshold = timeNow.plusSeconds(4);
+                if(timeNowThreshold.compareTo(signServerTime) < 0){
+                    System.out.println("Possilble replay attack");
+                    return;
+                }
+            }
+            catch (DateTimeParseException e) {
+                System.out.println("Malformed Return");
+                e.printStackTrace();
+                return;
+            }
+
+            String signServerHash = serverSignature.split(" ")[4];
+
+            String stringTohash = this.username + timeServer + this.getEpoch();
+
+            String verifySignRet = verifyServerSign(signServerHash, stringTohash);
+
+            if(verifySignRet.equals("Correct")){
+                //System.out.println("CORRECT SERVER SIGNATURE");
+            }else {
+                System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA");
+            }
 
             Iterator i = r.getReports().iterator();
             while (i.hasNext()) {
@@ -703,6 +772,43 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             e.printStackTrace();
         }
 
+    }
+
+    private String verifyServerSign(String serverHash, String userToHash) {
+
+        try {
+            FileInputStream fis1 = new FileInputStream("src/keys/serverPub.key");
+            byte[] decoded1 = new byte[fis1.available()];
+            fis1.read(decoded1);
+            fis1.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, pub);
+            byte[] hashBytes1 = java.util.Base64.getDecoder().decode(serverHash);
+            byte[] chunk = rsaCipher.doFinal(hashBytes1);
+            String witSignature = Base64.getEncoder().encodeToString(chunk);
+
+            byte[] messageByte2 = userToHash.getBytes();
+            MessageDigest digest2 = MessageDigest.getInstance("SHA-256");
+            digest2.update(messageByte2);
+            byte[] digestByte2 = digest2.digest();
+            String userHash = Base64.getEncoder().encodeToString(digestByte2);
+
+            if(!witSignature.equals(userHash)){
+                return "Error";
+            }
+
+        } catch (InvalidKeySpecException | NoSuchAlgorithmException | NoSuchPaddingException | IOException | IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException | InvalidKeyException e) {
+            System.out.println("Wrong signature");
+            e.printStackTrace();
+            return "Error";
+        }
+        return "Correct";
     }
 
     /*========================================== CONNECTION TIMEOUTS =================================================*/
