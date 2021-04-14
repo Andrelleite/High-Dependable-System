@@ -236,7 +236,7 @@ class Simulation{
         }else if(request.startsWith("user")){
             if(origin.equals("ha")){
                 user = regex.split(",")[1];
-                this.authorities.get(0).handshake(2,"user1","0","0","0");
+                this.authorities.get(0).handshake(2,user,"0","0",generated[2]);
                 System.out.println("HA is requesting "+user+" location.");
             }
         }else if(request.equals("position")){
