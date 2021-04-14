@@ -101,6 +101,49 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================SERVER-SYS=================================================================================
 
+    public void HASubscribe(String key) throws RemoteException{
+
+        try {
+            FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+            byte[] encoded1 = new byte[fis0.available()];
+            fis0.read(encoded1);
+            fis0.close();
+            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, priv);
+            byte[] hashBytes = java.util.Base64.getDecoder().decode(key);
+            byte[] chunk = rsaCipher.doFinal(hashBytes);
+            String decryptedKey = Base64.getEncoder().encodeToString(chunk);
+            byte[] decodedKey = Base64.getDecoder().decode(decryptedKey);
+            SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
+
+            String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
+
+            this.symKey.put("ha",originalKey);
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (InvalidKeySpecException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+    }
+
+
     public void subscribe(ClientInterface c, String user, String key) throws RemoteException{
         this.allSystemUsers.put(user,0.0);
         try {
@@ -476,16 +519,26 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             @Override
             public void run(){
 
+                String userFinal="";
+                int epochFinal = -1;
+
                 try {
                     Cipher cipher = null;
                     cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
+                    cipher.init(Cipher.DECRYPT_MODE, symKey.get("ha"));
 
                     byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
                     byte[] chunk2 = cipher.doFinal(hashBytes3);
                     String parse =  new String(chunk2, UTF_8);
 
+                    byte[] hashBytes4 = java.util.Base64.getDecoder().decode(user);
+                    byte[] chunk3 = cipher.doFinal(hashBytes4);
+                    userFinal =  new String(chunk3, UTF_8);
+
                     ep[0] = Integer.parseInt(parse);
+                    epochFinal = ep[0];
+
+                    System.out.println("bruh ->> " + ep[0] + " " + userFinal );
                 } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException e) {
                     e.printStackTrace();
                 }
@@ -496,7 +549,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 System.out.println("BIG BROTHER IS REQUESTING");*/
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 for(int i = 0; i < clientReports.size();i++){
-                    if(!clientReports.get(i).getUsername().toUpperCase().equals(user.toUpperCase())){
+                    if(!clientReports.get(i).getUsername().toUpperCase().equals(userFinal.toUpperCase())){
                         clientReports.remove(i);
                         i--;
                     }else if(clientReports.get(i).getEpoch() != ep[0]){
@@ -511,14 +564,14 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 //Get time
                 String time = java.time.LocalTime.now().toString();
 
-                String s1 = "ha" + user + time + epoch;
+                String s1 = "ha" + userFinal + time + epochFinal;
 
                 String finalS = "";
 
                 try {
 
                     Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(user));
+                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("ha"));
 
                     Iterator i = clientReports.iterator();
                     while (i.hasNext()) {
@@ -610,7 +663,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 try {
                     Cipher cipher = null;
                     cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
+                    cipher.init(Cipher.DECRYPT_MODE, symKey.get("ha"));
 
                     byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
                     byte[] chunk2 = cipher.doFinal(hashBytes3);
@@ -618,9 +671,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                     ep[0] = Integer.parseInt(parse);
 
-                    byte[] hashBytes4 = java.util.Base64.getDecoder().decode(epoch);
+                    byte[] hashBytes4 = java.util.Base64.getDecoder().decode(pos);
                     byte[] chunk3 = cipher.doFinal(hashBytes4);
                     String position =  new String(chunk3, UTF_8);
+
+                    System.out.println("bruh " + position);
 
                     positionDec[0] = position.split(",")[0];
                     positionDec[1] = position.split(",")[1];
@@ -665,7 +720,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 try {
 
                     Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(user));
+                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("ha"));
 
                     Iterator i = clientReports.iterator();
                     while (i.hasNext()) {
@@ -776,10 +831,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             for (int i = 0; i < list.size(); i++) {
                 for(int j = i+1; j < list.size(); j++){
                     if(list.get(i).getUsername().equals(list.get(j).getUsername())){
-                        if(list.get(i).getPosX() == list.get(j).getPosX()){
-                            if(list.get(i).getPosY() == list.get(j).getPosY()){
-                                list.remove(j);
-                                j--;
+                        if(list.get(i).getWitness().equals(list.get(j).getWitness())){
+                            if(list.get(i).getPosX() == list.get(j).getPosX()){
+                                if(list.get(i).getPosY() == list.get(j).getPosY()){
+                                    list.remove(j);
+                                    j--;
+                                }
                             }
                         }
                     }
