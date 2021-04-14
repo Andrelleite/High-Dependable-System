@@ -23,4 +23,5 @@ public interface ServerInterface extends Remote, Serializable {
     public ServerReturn obtainLocationReport(String user, String epoch) throws IOException, ClassNotFoundException, InterruptedException;
     public ServerReturn obtainUsersAtLocation(String user, String pos, String epoch) throws IOException, ClassNotFoundException, InterruptedException;
     public void HASubscribe(String key) throws RemoteException;
+
 }

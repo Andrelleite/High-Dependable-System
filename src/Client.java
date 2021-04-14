@@ -1,14 +1,13 @@
 import javax.crypto.*;
 import javax.swing.plaf.synth.SynthOptionPaneUI;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.lang.reflect.Array;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.server.UnicastRemoteObject;
 import java.security.*;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -142,13 +141,15 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             System.out.println("lado do client: " + encodedKey);
             this.setSymKey(secretKey);
 
-            FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+            /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
             byte[] encoded2 = new byte[fis01.available()];
             fis01.read(encoded2);
             fis01.close();
             X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
             KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
-            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);*/
+
+            PublicKey pub = loadPublicKey("server");
 
             Cipher cipherRSA = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipherRSA.init(Cipher.ENCRYPT_MODE, pub);
@@ -159,10 +160,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             this.setKey(encryptedKey);
 
             s.subscribe(this.getClientInterface(),this.getUsername(), encryptedKey);
-
-
-
-
 
         } catch (ConnectException ev){
             try {
@@ -187,15 +184,11 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             }
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
             e.printStackTrace();
         } catch (NoSuchPaddingException e) {
-            e.printStackTrace();
-        } catch (InvalidKeySpecException e) {
             e.printStackTrace();
         } catch (BadPaddingException e) {
             e.printStackTrace();
@@ -263,6 +256,38 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     //=============================================================================================================
 
+
+    private PublicKey loadPublicKey (String keyName) {
+        try {
+            FileInputStream fin = new FileInputStream("src/keys/" + keyName + ".cer");
+            CertificateFactory f = CertificateFactory.getInstance("X.509");
+            X509Certificate certificate = (X509Certificate) f.generateCertificate(fin);
+            PublicKey pk = certificate.getPublicKey();
+            //System.out.println("PUB KEY" + pk);
+            return pk;
+        }catch (Exception e){
+            System.out.println(e);
+        }
+        return null;
+    }
+
+    private PrivateKey loadPrivKey (String keyName) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            InputStream readStream = new FileInputStream("src/keys/keys.jks");
+            keyStore.load(readStream, ("keystore").toCharArray());
+            KeyStore.PrivateKeyEntry entry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyName, new KeyStore.PasswordProtection(("keystore").toCharArray()));
+            PrivateKey pk = entry.getPrivateKey();
+            //System.out.println("PRIV KEY " + pk);
+            return pk;
+        } catch(Exception e){
+            System.out.println(e);
+        }
+
+        return null;
+    }
+
+
     public Report generateLocationReportWitness(ClientInterface c, String username, int userEpoch) throws RemoteException{
         try {
             File myObj = new File("src/grid/grid1.txt");
@@ -294,13 +319,15 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             String s = username + time + this.getUsername() + userEpoch; //+ this.getCoordinate1() + this.getCoordinate2();
 
                             //get witness private key
-                            FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
+                            /*FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
                             byte[] encoded1 = new byte[fis0.available()];
                             fis0.read(encoded1);
                             fis0.close();
                             PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
                             KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
                             PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+                             */
+                            PrivateKey priv = loadPrivKey(this.getUsername());
 
                             //Hash message
                             byte[] messageByte0 = s.getBytes();
@@ -332,7 +359,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                 } catch (NumberFormatException ex) { // handle your exception
                     System.out.println("Malformed input found!");
                     this.setError(1);
-                } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException | NoSuchPaddingException | InvalidKeyException e) {
+                } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException e) {
                     e.printStackTrace();
                 } catch (IllegalBlockSizeException e) {
                     e.printStackTrace();
@@ -396,6 +423,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     public String verifyWitnessSignature(Report message, ClientInterface h) {
         try {
+            /*
             FileInputStream fis1 = new FileInputStream("src/keys/" + message.getWitness() + "Pub.key");
             byte[] decoded1 = new byte[fis1.available()];
             fis1.read(decoded1);
@@ -403,6 +431,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
             KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
             PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+             */
+            PublicKey pub = loadPublicKey(message.getWitness());
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, pub);
@@ -422,10 +452,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             }else{
                 return "Error";
             }
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (InvalidKeySpecException e) {
-            e.printStackTrace();
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (BadPaddingException e) {
@@ -438,8 +464,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             return "Error";
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
         } catch (IllegalBlockSizeException e) {
             e.printStackTrace();
         }
@@ -450,6 +474,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
         ArrayList<String> usersToContact = findUser();
         Report message = null;
+        String serverSignature = "";
 
         if(usersToContact.size() != 0){
             Iterator i = usersToContact.iterator();
@@ -499,13 +524,16 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     String s1 = this.getUsername() + time  + this.getEpoch() + this.getCoordinate1() + this.getCoordinate2();
 
                     //get client private key
-                    FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
+                    /*FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
                     byte[] encoded1 = new byte[fis0.available()];
                     fis0.read(encoded1);
                     fis0.close();
                     PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
                     KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
                     PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+                     */
+
+                    PrivateKey priv = loadPrivKey(this.getUsername());
 
                     //Hash message
                     byte[] messageByte0 = s1.getBytes();
@@ -560,11 +588,11 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     // REPORT SUBMISSION
                     try{
                         ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-                        String serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
+                        serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
                         System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                     } catch (ConnectException ev){
                         try {
-                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
                             System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                         } catch (InterruptedException | IOException | NotBoundException interruptedException) {
                             System.out.println("SERVICE IS DOWN. COME BACK LATER.");
@@ -572,15 +600,51 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         }
                     } catch (RemoteException | MalformedURLException | NotBoundException e){
                         try {
-                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
                             System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                         } catch (ConnectException ev){
-                            String serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
+                            serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
                             System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
                         } catch (InterruptedException | IOException | NotBoundException interruptedException) {
                             System.out.println("SERVICE IS DOWN. COME BACK LATER.");
                             return;
                         }
+                    }
+
+                    if(serverSignature.equals("")){
+                        System.out.println("SOMETHING WRONG HAPPENED, NO RETURN FROM THE SERVER");
+                    }else if(serverSignature.equals("null")){
+                        System.out.println("SOMETHING WRONG HAPPENED, RETURN NOT SIGNED");
+                    }else {
+                        String timeServer = serverSignature.split(" ")[1];
+
+                        try{
+                            LocalTime signServerTime = LocalTime.parse(timeServer);
+                            LocalTime timeNow = LocalTime.now();
+                            //4 segundos para possíveis atrasos na rede
+                            LocalTime timeNowThreshold = timeNow.plusSeconds(4);
+                            if(timeNowThreshold.compareTo(signServerTime) < 0){
+                                System.out.println("Possilble replay attack");
+                                return;
+                            }
+                        }
+                        catch (DateTimeParseException e) {
+                            System.out.println("Malformed Return");
+                            e.printStackTrace();
+                        }
+
+                        String signServerHash = serverSignature.split(" ")[4];
+
+                        String stringTohash = this.username + timeServer + this.getEpoch();
+
+                        String verifySignRet = verifyServerSign(signServerHash, stringTohash);
+
+                        if(verifySignRet.equals("Correct")){
+                            //System.out.println("CORRECT SERVER SIGNATURE");
+                        }else {
+                            System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA");
+                        }
+
                     }
 
                 } catch (Exception e) {
@@ -595,6 +659,44 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         }
 
     }
+
+    private String verifyServerSign(String serverHash, String userToHash) {
+
+        try {
+            FileInputStream fis1 = new FileInputStream("src/keys/serverPub.key");
+            byte[] decoded1 = new byte[fis1.available()];
+            fis1.read(decoded1);
+            fis1.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, pub);
+            byte[] hashBytes1 = java.util.Base64.getDecoder().decode(serverHash);
+            byte[] chunk = rsaCipher.doFinal(hashBytes1);
+            String witSignature = Base64.getEncoder().encodeToString(chunk);
+
+            byte[] messageByte2 = userToHash.getBytes();
+            MessageDigest digest2 = MessageDigest.getInstance("SHA-256");
+            digest2.update(messageByte2);
+            byte[] digestByte2 = digest2.digest();
+            String userHash = Base64.getEncoder().encodeToString(digestByte2);
+
+            if(!witSignature.equals(userHash)){
+                return "Error";
+            }
+
+        } catch (InvalidKeySpecException | NoSuchAlgorithmException | NoSuchPaddingException | IOException | IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException | InvalidKeyException e) {
+            System.out.println("Wrong signature");
+            e.printStackTrace();
+            return "Error";
+        }
+        return "Correct";
+    }
+
 
     public void getReports(String ep) throws RemoteException{
 
@@ -634,6 +736,38 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
             Cipher rsaCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, this.getSymKey());
+
+            String serverSignature = r.getServerProof();
+
+            String timeServer = serverSignature.split(" ")[1];
+
+            try{
+                LocalTime signServerTime = LocalTime.parse(timeServer);
+                LocalTime timeNow = LocalTime.now();
+                //4 segundos para possíveis atrasos na rede
+                LocalTime timeNowThreshold = timeNow.plusSeconds(4);
+                if(timeNowThreshold.compareTo(signServerTime) < 0){
+                    System.out.println("Possilble replay attack");
+                    return;
+                }
+            }
+            catch (DateTimeParseException e) {
+                System.out.println("Malformed Return");
+                e.printStackTrace();
+                return;
+            }
+
+            String signServerHash = serverSignature.split(" ")[4];
+
+            String stringTohash = this.username + timeServer + this.getEpoch();
+
+            String verifySignRet = verifyServerSign(signServerHash, stringTohash);
+
+            if(verifySignRet.equals("Correct")){
+                //System.out.println("CORRECT SERVER SIGNATURE");
+            }else {
+                System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA");
+            }
 
             Iterator i = r.getReports().iterator();
             while (i.hasNext()) {

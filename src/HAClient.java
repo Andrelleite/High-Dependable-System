@@ -80,6 +80,7 @@ public class HAClient extends Thread{
                 /* All users location report at specific location and epoch *test* */
                 System.out.println("$$$ USERS AT: "+x+","+y+" IN EPOCH "+epoch+" $$$");
 
+
                 Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
 
@@ -96,6 +97,7 @@ public class HAClient extends Thread{
                 reports = s.getReports();
 
                 System.out.println("SERVER RETURN: " + s.getServerProof());
+
                 if(reports != null){
                     for(int i = 0; i < reports.size(); i++){
                         System.out.println("\tENTRY "+(i+1)+": "+reports.get(i).getUsername());
