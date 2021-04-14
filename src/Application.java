@@ -15,7 +15,7 @@ import static java.rmi.Naming.*;
 class Simulation{
 
     private String epoch;
-    private int f,u,ha;
+    private int f,fline,u,ha;
     private List<Byzantine> byzantines;
     private List<HAClient> authorities;
     private Map<String,Integer> clientEpochs;
@@ -89,7 +89,6 @@ class Simulation{
         bad.setClientInterface(h);
         bad.loadMoves();
         System.out.println("new client added : " + username);
-        System.out.println(bad.getMoveList());
         this.byzantines.add(bad);
     }
 
@@ -162,9 +161,24 @@ class Simulation{
         for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
             if(this.byzantines.get(i).getUsername().equals(username)){
                 original = this.byzantines.get(i).getUsername();
-                this.byzantines.get(i).fakeIdentity(target);
+                this.byzantines.get(i).fakeIdentity(target,original);
                 this.byzantines.get(i).setRequestLocationProof();
-                this.byzantines.get(i).fakeIdentity(original);
+                this.byzantines.get(i).fakeIdentity(original,original);
+                flag = 1;
+            }
+        }
+    }
+
+    private void spyOnReports(String epoch, String byz, String victim) throws RemoteException {
+        int flag = 0;
+        String original;
+        System.out.println("=================================== I'M GONNA WOW YA ====================================");
+        for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
+            if(this.byzantines.get(i).getUsername().equals(byz)){
+                original = this.byzantines.get(i).getUsername();
+                this.byzantines.get(i).fakeIdentity(victim,original);
+                this.byzantines.get(i).getReports(epoch);
+                this.byzantines.get(i).fakeIdentity(original,original);
                 flag = 1;
             }
         }
@@ -222,7 +236,7 @@ class Simulation{
         }else if(request.startsWith("user")){
             if(origin.equals("ha")){
                 user = regex.split(",")[1];
-                this.authorities.get(0).handshake(2,user,"0","0",generated[2]);
+                this.authorities.get(0).handshake(2,"user1","0","0","0");
                 System.out.println("HA is requesting "+user+" location.");
             }
         }else if(request.equals("position")){
@@ -240,6 +254,10 @@ class Simulation{
         }else if(request.equals("up")){
             System.out.println("Turn on Server.");
             startServer();
+        }else if(origin.equals("spy")){
+            if(request.equals("report")){
+                spyOnReports(generated[2],generated[3],generated[4]);
+            }
         }
 
 
@@ -257,6 +275,8 @@ class Simulation{
 
             if(lineCounter == 0){
                 this.f = setValue(line);
+                this.fline = Integer.parseInt(line.split(",")[2]);
+                System.out.println("F: "+this.f+" F': "+this.fline);
                 startServer();
             }else if(lineCounter == 1){
                 this.u = setValue(line);
@@ -273,18 +293,18 @@ class Simulation{
                 startClients();
             }else{
                 Thread worker = new Thread(){
-                  @Override
-                  public void run(){
-                      try {
-                          instructionMan(line);
-                      } catch (IOException e) {
-                          e.printStackTrace();
-                      } catch (NotBoundException e) {
-                          e.printStackTrace();
-                      } catch (ClassNotFoundException e) {
-                          e.printStackTrace();
-                      }
-                  }
+                    @Override
+                    public void run(){
+                        try {
+                            instructionMan(line);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        } catch (NotBoundException e) {
+                            e.printStackTrace();
+                        } catch (ClassNotFoundException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 };
                 worker.start();
                 this.workers.add(worker);
