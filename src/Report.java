@@ -17,7 +17,7 @@ public class Report implements Serializable {
     private int posXWitness;
     private int posYWitness;
 
-    public Report(ClientInterface cl, int x, int y, int ep, String user,String userSignature,String timeStamp, String witness, String witnessSignature, String witnessTimeStamp, String witnessPos){
+    public Report(ClientInterface cl, int x, int y, int ep, String user, String userSignature, String timeStamp, String witness, String witnessSignature, String witnessTimeStamp, String witnessPos) {
         this.c = cl;
         this.posX = x;
         this.posY = y;
@@ -47,7 +47,9 @@ public class Report implements Serializable {
         return this.epoch;
     }
 
-    public String getUsername() {return this.username;}
+    public String getUsername() {
+        return this.username;
+    }
 
     public void setPosX(int posX) {
         this.posX = posX;
@@ -124,4 +126,5 @@ public class Report implements Serializable {
     public String getWitnessPos() {
         return witnessPos;
     }
+
 }

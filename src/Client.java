@@ -59,6 +59,10 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     private Map<Integer, Pair<Integer,Integer>> moveList = new HashMap<Integer, Pair<Integer,Integer>>();
     private List<String> clientsWithError = new ArrayList<String>();
 
+    public Map<Integer, Pair<Integer, Integer>> getMoveList() {
+        return moveList;
+    }
+
     public String getKey() {
         return key;
     }
@@ -273,10 +277,10 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     private PrivateKey loadPrivKey (String keyName) {
         try {
-            KeyStore keyStore = KeyStore.getInstance("PKCS12");
-            InputStream readStream = new FileInputStream("src/keys/keys.jks");
-            keyStore.load(readStream, ("keystore").toCharArray());
-            KeyStore.PrivateKeyEntry entry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyName, new KeyStore.PasswordProtection(("keystore").toCharArray()));
+            KeyStore keyStore = KeyStore.getInstance("JKS");
+            InputStream readStream = new FileInputStream("src/keys/" + keyName +".keystore");
+            keyStore.load(readStream, (keyName + "key").toCharArray());
+            KeyStore.PrivateKeyEntry entry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyName, new KeyStore.PasswordProtection((keyName + "key").toCharArray()));
             PrivateKey pk = entry.getPrivateKey();
             //System.out.println("PRIV KEY " + pk);
             return pk;
@@ -304,6 +308,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         String coord2 = data.split(",")[3];
 
                         //vamos buscar as coordenadas a fontes seguras
+                        //System.out.println("user: " +this.getUsername() + " epch: " + userEpoch);
                         double x2 = Double.parseDouble(coord1);
                         double y2 = Double.parseDouble(coord2);
                         int x1 = moveList.get(userEpoch).getFirst();
@@ -642,13 +647,13 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         if(verifySignRet.equals("Correct")){
                             //System.out.println("CORRECT SERVER SIGNATURE");
                         }else {
-                            System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA");
+                            System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA (REQUEST LOCATION PROOF)");
                         }
 
                     }
 
                 } catch (Exception e) {
-                    System.out.println("user + " + userToContact + " nao foi encontrado");
+                    System.out.println( userToContact + " nao foi encontrado");
                     System.out.println("Exception in main: " + e);
                     e.printStackTrace();
                 }
@@ -663,13 +668,15 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     private String verifyServerSign(String serverHash, String userToHash) {
 
         try {
-            FileInputStream fis1 = new FileInputStream("src/keys/serverPub.key");
+            /*FileInputStream fis1 = new FileInputStream("src/keys/serverPub.key");
             byte[] decoded1 = new byte[fis1.available()];
             fis1.read(decoded1);
             fis1.close();
             X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
             KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
-            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);*/
+
+            PublicKey pub = loadPublicKey("server");
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, pub);
@@ -687,7 +694,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                 return "Error";
             }
 
-        } catch (InvalidKeySpecException | NoSuchAlgorithmException | NoSuchPaddingException | IOException | IllegalBlockSizeException e) {
+        } catch ( NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException e) {
             e.printStackTrace();
         } catch (BadPaddingException | InvalidKeyException e) {
             System.out.println("Wrong signature");
@@ -766,7 +773,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             if(verifySignRet.equals("Correct")){
                 //System.out.println("CORRECT SERVER SIGNATURE");
             }else {
-                System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA");
+                System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA (GET REPORTS)");
             }
 
             Iterator i = r.getReports().iterator();

@@ -2,12 +2,12 @@ import javax.crypto.*;
 import javax.print.attribute.standard.RequestingUserName;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.rmi.*;
-import java.security.InvalidKeyException;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
+import java.security.*;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -23,6 +23,7 @@ public class HAClient extends Thread{
     private ServerInterface h;
     private IdentityHashMap<Integer,Integer> identity;
     private SecretKey symKey;
+    private OutputManager fileMan;
 
     public void setSymKey(SecretKey symKey) {
         this.symKey = symKey;
@@ -32,8 +33,40 @@ public class HAClient extends Thread{
         return symKey;
     }
 
-    public HAClient(){
+    public HAClient() throws IOException, NotBoundException, ClassNotFoundException, NotBoundException, IOException, ClassNotFoundException{
         super();
+        this.fileMan = new OutputManager("HA","Health Authority");
+        this.fileMan.initFile();
+    }
+
+    private PublicKey loadPublicKey (String keyName) {
+        try {
+            FileInputStream fin = new FileInputStream("src/keys/" + keyName + ".cer");
+            CertificateFactory f = CertificateFactory.getInstance("X.509");
+            X509Certificate certificate = (X509Certificate) f.generateCertificate(fin);
+            PublicKey pk = certificate.getPublicKey();
+            //System.out.println("PUB KEY" + pk);
+            return pk;
+        }catch (Exception e){
+            System.out.println(e);
+        }
+        return null;
+    }
+
+    private PrivateKey loadPrivKey (String keyName) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("JKS");
+            InputStream readStream = new FileInputStream("src/keys/" + keyName +".keystore");
+            keyStore.load(readStream, (keyName + "key").toCharArray());
+            KeyStore.PrivateKeyEntry entry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyName, new KeyStore.PasswordProtection((keyName + "key").toCharArray()));
+            PrivateKey pk = entry.getPrivateKey();
+            //System.out.println("PRIV KEY " + pk);
+            return pk;
+        } catch(Exception e){
+            System.out.println(e);
+        }
+
+        return null;
     }
 
     public void handshake(int op,String user,String x, String y, String epoch){
@@ -46,13 +79,15 @@ public class HAClient extends Thread{
                 System.out.println("lado do ha client: " + encodedKey);
                 this.setSymKey(secretKey);
 
-                FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+                /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
                 byte[] encoded2 = new byte[fis01.available()];
                 fis01.read(encoded2);
                 fis01.close();
                 X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
                 KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
-                PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+                PublicKey pub = keyFacPub.generatePublic(publicKeySpec);*/
+
+                PublicKey pub = loadPublicKey("server");
 
                 Cipher cipherRSA = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                 cipherRSA.init(Cipher.ENCRYPT_MODE, pub);
@@ -78,8 +113,7 @@ public class HAClient extends Thread{
         try {
             if(op == 1){
                 /* All users location report at specific location and epoch *test* */
-                System.out.println("$$$ USERS AT: "+x+","+y+" IN EPOCH "+epoch+" $$$");
-
+                this.fileMan.appendInformation(" [REQUEST TO SERVER] USERS AT: "+x+","+y+" IN EPOCH "+epoch+" $$$");
 
                 Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
@@ -92,22 +126,52 @@ public class HAClient extends Thread{
                 byte[] cipherBytes4 = cipherReport.doFinal(location.getBytes());
                 String locationEnc = Base64.getEncoder().encodeToString(cipherBytes4);
 
-                ServerReturn s = h.obtainUsersAtLocation("ha", locationEnc,epochEnc);
+                ServerReturn s = h.obtainUsersAtLocation(locationEnc,epochEnc);
 
                 reports = s.getReports();
 
-                System.out.println("SERVER RETURN: " + s.getServerProof());
+                this.fileMan.appendInformation("\t\t\tSERVER RETURN: " + s.getServerProof());
 
                 if(reports != null){
-                    for(int i = 0; i < reports.size(); i++){
-                        System.out.println("\tENTRY "+(i+1)+": "+reports.get(i).getUsername());
+
+                    Cipher rsaCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                    rsaCipher.init(Cipher.DECRYPT_MODE, this.getSymKey());
+
+                    Iterator i = reports.iterator();
+                    while (i.hasNext()) {
+
+                        Report re = (Report) i.next();
+
+                        byte[] hashBytes1 = java.util.Base64.getDecoder().decode(re.getEncryptedInfo());
+                        byte[] chunk = rsaCipher.doFinal(hashBytes1);
+                        String info = Base64.getEncoder().encodeToString(chunk);
+                        info = info.split("=")[0];
+
+                        re.setPosX(Integer.parseInt(info.split("w")[0].split("q")[1]));
+                        re.setPosY(Integer.parseInt(info.split("w")[1].split("q")[1]));
+                        re.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
+
+                        byte[] hashBytes3 = java.util.Base64.getDecoder().decode(re.getWitness());
+                        byte[] chunk2 = rsaCipher.doFinal(hashBytes3);
+                        String witness =  new String(chunk2, UTF_8);
+
+                        re.setWitness(witness);
+
+                        byte[] hashBytes4 = java.util.Base64.getDecoder().decode(re.getUsername());
+                        byte[] chunk3 = rsaCipher.doFinal(hashBytes4);
+                        String username =  new String(chunk3, UTF_8);
+
+                        re.setUsername(username);
+                        this.fileMan.appendInformation("\tENTRY "+": "+re.getUsername());
+
                     }
+
                 }else{
-                    System.out.println("No entries for that combination.");
+                    this.fileMan.appendInformation("No entries for that combination.");
                 }
             }else if(op == 2){
                 /* Specific user report at specific epochs *test* */
-                System.out.println("$$$ LOCATIONS OF USER: "+user+" at epoch "+epoch+" $$$");
+                this.fileMan.appendInformation(" [REQUEST TO SERVER]  LOCATIONS OF USER: "+user+" at epoch "+epoch+" $$$");
 
                 Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
@@ -122,7 +186,7 @@ public class HAClient extends Thread{
 
                 reports = s.getReports();
 
-                System.out.println("SERVER RETURN: " + s.getServerProof());
+                this.fileMan.appendInformation("SERVER RETURN: " + s.getServerProof());
 
                 Cipher rsaCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 rsaCipher.init(Cipher.DECRYPT_MODE, this.getSymKey());
@@ -131,16 +195,6 @@ public class HAClient extends Thread{
                 while (i.hasNext()) {
 
                     Report re = (Report) i.next();
-
-                /*System.out.println("===============================================================================================");
-                System.out.println("RECEIVED THE SERVER PROOF0 OF LOCATION FROM - "+ re.getUsername());
-                System.out.println("USER SIGNATURE: " + re.getUserSignature());
-                System.out.println("TIMESTAMP: " + re.getTimeStamp());
-                System.out.println("POS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
-                System.out.println("WITNESS: " + re.getWitness());
-                System.out.println("WITNESS SIGNATURE: " + re.getWitnessSignature());
-                System.out.println("WITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
-                System.out.println("===============================================================================================");*/
 
                     byte[] hashBytes1 = java.util.Base64.getDecoder().decode(re.getEncryptedInfo());
                     byte[] chunk = rsaCipher.doFinal(hashBytes1);
@@ -157,15 +211,16 @@ public class HAClient extends Thread{
 
                     re.setWitness(witness);
 
-                    System.out.println("==================ZECA=============================================");
-                    System.out.println("RECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername());
-                    System.out.println("USER SIGNATURE: " + re.getUserSignature());
-                    System.out.println("TIMESTAMP: " + re.getTimeStamp());
-                    System.out.println("POS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
-                    System.out.println("WITNESS: " + re.getWitness());
-                    System.out.println("WITNESS SIGNATURE: " + re.getWitnessSignature());
-                    System.out.println("WITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
-                    System.out.println("===============================================================================================");
+                    /*byte[] hashBytes4 = java.util.Base64.getDecoder().decode(re.getUsername());
+                    byte[] chunk3 = rsaCipher.doFinal(hashBytes4);
+                    String username =  new String(chunk3, UTF_8);
+
+                    re.setUsername(username);*/
+                    this.fileMan.appendInformation("\t\t\tRECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername()+
+                            "\n\t\t\tUSER SIGNATURE: " + re.getUserSignature() + "TIMESTAMP: " + re.getTimeStamp() +
+                            "\n\t\tPOS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch() +
+                            "\n\t\t\tWITNESS: " + re.getWitness() + "WITNESS SIGNATURE: " + re.getWitnessSignature() +
+                            "\n\t\t\tWITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
 
                 }
 
@@ -179,14 +234,14 @@ public class HAClient extends Thread{
                     System.out.println("No entries for that combination.");
                 }*/
             }else{
-                System.out.println("OP Code unavailable");
+                this.fileMan.appendInformation("OP Code unavailable");
             }
         }catch (ConnectException | UnmarshalException | InterruptedException e){
             try {
                 this.h = null;
                 retry(op,user,x,y,epoch);
             } catch (InterruptedException interruptedException) {
-                System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+                this.fileMan.appendInformation("SERVICE IS DOWN. COME BACK LATER.");
             }
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -209,7 +264,7 @@ public class HAClient extends Thread{
         thread.start();
         thread.join();
         if(this.h == null){
-            System.out.println("SERVICE IS DOWN. COME BACK LATER.");
+            this.fileMan.appendInformation("SERVICE IS DOWN. COME BACK LATER.");
             return;
         }else{
             communicate(this.h,op,user,x,y,epoch);
@@ -220,7 +275,7 @@ public class HAClient extends Thread{
     public void run(){
         int tries = 0;
         while(this.h == null && tries < 5){
-            System.out.println("New try.");
+            this.fileMan.appendInformation("New try.");
             try {
                 Thread.sleep(2000);
                 this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
@@ -235,8 +290,9 @@ public class HAClient extends Thread{
 
     //====================================MAIN==========================================================================
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws NotBoundException, IOException, ClassNotFoundException {
         HAClient ha = new HAClient();
+        ha.handshake(1,"","30","37","0");
         ha.handshake(1,"","30","37","0");
     }
 }

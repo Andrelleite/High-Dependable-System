@@ -1,0 +1,7 @@
+=================== Server Output File ===================
+23:28:14 -> ===== HA REQUESTING LOCATION REPORTS FOR POSITION (10,20) AT EPOCH 0 =====
+23:28:14 -> 			REQUEST SIZE :0
+				REQUEST COMPLETE
+23:28:15 -> ===== HA REQUESTING user2 LOCATION REPORTS AT EPOCH ===== 0
+23:28:15 -> 			REQUEST SIZE :2
+				REQUEST COMPLETE
