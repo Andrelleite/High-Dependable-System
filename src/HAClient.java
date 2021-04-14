@@ -14,16 +14,15 @@ public class HAClient extends Thread{
 
     public HAClient(){
         super();
-        handshake();
     }
 
-    private void handshake(){
+    public void handshake(int op,String user,String x, String y, String epoch){
         try {
             try {
                 this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
-                communicate(this.h);
+                communicate(this.h, op,user,x,y,epoch);
             }catch (RemoteException | MalformedURLException | NotBoundException e){
-                retry();
+                retry(op,user,x,y,epoch);
             }
         } catch (Exception e) {
             System.out.println("Exception in main: " + e);
@@ -31,39 +30,42 @@ public class HAClient extends Thread{
         }
     }
 
-    private void communicate(ServerInterface h) throws IOException, ClassNotFoundException {
+    private void communicate(ServerInterface h, int op,String user,String x, String y, String epoch) throws IOException, ClassNotFoundException {
 
         ArrayList<Report> reports;
         System.setProperty("java.rmi.transport.tcp.responseTimeout", "2000");
         try {
-            /* All users location report at specific epochs *test* */
-            System.out.println("$$$ USERS AT: ("+10+","+20+") IN EPOCH"+2+" $$$");
-            reports = (ArrayList<Report>) h.obtainUsersAtLocation("hauser", "10,20","2").getReports();
-            if(reports != null){
-                for(int i = 0; i < reports.size(); i++){
-                    System.out.println("\tENTRY "+(i+1)+": "+reports.get(i).getUsername());
+            if(op == 1){
+                /* All users location report at specific epochs *test* */
+                System.out.println("$$$ USERS AT: "+x+","+y+" IN EPOCH "+epoch+" $$$");
+                reports = (ArrayList<Report>) h.obtainUsersAtLocation( x+","+y,epoch).getReports();
+                if(reports != null){
+                    for(int i = 0; i < reports.size(); i++){
+                        System.out.println("\tENTRY "+(i+1)+": "+reports.get(i).getUsername());
+                    }
+                }else{
+                    System.out.println("No entries for that combination.");
+                }
+            }else if(op == 2){
+                /* Specific user report at specific epochs *test* */
+                System.out.println("$$$ LOCATIONS OF USER: "+user+" at epoch "+epoch+" $$$");
+                reports = (ArrayList<Report>) h.obtainLocationReport(user,epoch).getReports();
+                if(reports != null){
+                    for(int i = 0; i < reports.size(); i++){
+                        System.out.println("\tENTRY "+(i+1)+": "+
+                                reports.get(i).getUsername()+" -> ("+
+                                reports.get(i).getPosX()+","+reports.get(i).getPosY()+")");
+                    }
+                }else{
+                    System.out.println("No entries for that combination.");
                 }
             }else{
-                System.out.println("No entries for that combination.");
+                System.out.println("OP Code unavailable");
             }
-
-            /* Specific user report at specific epochs *test* */
-            System.out.println("$$$ LOCATIONS OF USER: "+"user1"+" $$$");
-            reports = (ArrayList<Report>) h.obtainLocationReport("user1","2").getReports();
-            if(reports != null){
-                for(int i = 0; i < reports.size(); i++){
-                    System.out.println("\tENTRY "+(i+1)+": "+
-                            reports.get(i).getUsername()+" -> ("+
-                            reports.get(i).getPosX()+","+reports.get(i).getPosY()+")");
-                }
-            }else{
-                System.out.println("No entries for that combination.");
-            }
-
         }catch (ConnectException | UnmarshalException | InterruptedException e){
             try {
                 this.h = null;
-                retry();
+                retry(op,user,x,y,epoch);
             } catch (InterruptedException interruptedException) {
                 System.out.println("SERVICE IS DOWN. COME BACK LATER.");
             }
@@ -73,7 +75,7 @@ public class HAClient extends Thread{
 
     //=======================THREAD CONNECTION==========================================================================
 
-    private void retry() throws InterruptedException, IOException, ClassNotFoundException {
+    private void retry(int op,String user,String x, String y, String epoch) throws InterruptedException, IOException, ClassNotFoundException {
         Thread thread = new Thread(this);
         thread.start();
         thread.join();
@@ -81,7 +83,7 @@ public class HAClient extends Thread{
             System.out.println("SERVICE IS DOWN. COME BACK LATER.");
             return;
         }else{
-            communicate(this.h);
+            communicate(this.h,op,user,x,y,epoch);
         }
     }
 

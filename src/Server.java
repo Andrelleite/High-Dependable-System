@@ -6,6 +6,8 @@ import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.*;
 import java.security.*;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -28,10 +30,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private boolean imPrimary;
     private String IPV4;
     private int portRMI;
+    private int f;
 
     //=======================CONNECTION=================================================================================
 
-    public Server() throws IOException, NotBoundException, ClassNotFoundException {
+    public Server(int f) throws IOException, NotBoundException, ClassNotFoundException {
+        this.f = f;
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
         this.symKey = new HashMap<>();
@@ -60,7 +64,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         System.out.println("I'm in.");
     }
 
-    private ServerInterface retryConnection(int port) throws NotBoundException, IOException {
+    private ServerInterface retryConnection(int port) throws IOException {
 
         ServerInterface serverInt = null;
         Server server = this;
@@ -74,12 +78,27 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         } catch (ExportException ex) {
             imPrimary = false;
             System.out.println("I'm the backup");
-            serverInt = (ServerInterface) Naming.lookup("rmi://"+this.IPV4+":" + port + "/SERVER");
-            System.out.println("Connetion to primary succeded...");
+            try {
+                serverInt = (ServerInterface) Naming.lookup("rmi://"+this.IPV4+":" + port + "/SERVER");
+                System.out.println("Connetion to primary succeded...");
+            } catch (NotBoundException e) {
+                try {
+                    LocateRegistry.createRegistry(port);
+                }catch (ExportException s){
+                    LocateRegistry.getRegistry(port);
+                }
+                Naming.rebind("rmi://"+this.IPV4+":" + port + "/SERVER", server);
+                imPrimary = true;
+                System.out.println("I'm the primary");
+            }
         }
-
         System.out.println("Server ready...");
         return serverInt;
+    }
+
+    public int shutdown() throws MalformedURLException, NotBoundException, RemoteException {
+        Naming.unbind("rmi://"+this.IPV4+":" + portRMI + "/SERVER");
+        return 1;
     }
 
     //=======================SERVER-SYS=================================================================================
@@ -136,6 +155,36 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     }
 
     //=======================USER-METHODS===============================================================================
+
+    private PublicKey loadPublicKey (String keyName) {
+        try {
+            FileInputStream fin = new FileInputStream("src/keys/" + keyName + ".cer");
+            CertificateFactory f = CertificateFactory.getInstance("X.509");
+            X509Certificate certificate = (X509Certificate) f.generateCertificate(fin);
+            PublicKey pk = certificate.getPublicKey();
+            //System.out.println("PUB KEY" + pk);
+            return pk;
+        }catch (Exception e){
+            System.out.println(e);
+        }
+        return null;
+    }
+
+    private PrivateKey loadPrivKey (String keyName) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            InputStream readStream = new FileInputStream("src/keys/keys.jks");
+            keyStore.load(readStream, ("keystore").toCharArray());
+            KeyStore.PrivateKeyEntry entry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyName, new KeyStore.PasswordProtection(("keystore").toCharArray()));
+            PrivateKey pk = entry.getPrivateKey();
+            //System.out.println("PRIV KEY " + pk);
+            return pk;
+        } catch(Exception e){
+            System.out.println(e);
+        }
+
+        return null;
+    }
 
     public String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException, InterruptedException {
 
@@ -244,6 +293,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         String s1 = user + time + locationReport.getEpoch();
 
                         //get server private key
+                        /*
                         FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                         byte[] encoded1 = new byte[fis0.available()];
                         fis0.read(encoded1);
@@ -251,6 +301,10 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
                         KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
                         PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+                         */
+
+                        PrivateKey priv = loadPrivKey("server");
 
                         //Hash message
                         byte[] messageByte0 = s1.getBytes();
@@ -269,7 +323,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         serverReturn[0] = "time: " + time + " | signature: " + signedHash;
 
 
-                    } catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException | NoSuchPaddingException | InvalidKeyException e) {
+                    } catch (IOException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException e) {
                         e.printStackTrace();
                         System.out.println("Things went sideways :(");
                     } catch (BadPaddingException e) {
@@ -394,6 +448,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     }
 
                     //get server private key
+                    /*
                     FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                     byte[] encoded1 = new byte[fis0.available()];
                     fis0.read(encoded1);
@@ -401,6 +456,10 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
                     KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
                     PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+                     */
+
+                    PrivateKey priv = loadPrivKey("server");
 
                     //Hash message
                     byte[] messageByte0 = s1.getBytes();
@@ -426,13 +485,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     e.printStackTrace();
                 } catch (BadPaddingException e) {
                     e.printStackTrace();
-                } catch (InvalidKeySpecException e) {
-                    e.printStackTrace();
                 } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
                     e.printStackTrace();
                 }
 
@@ -474,9 +527,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 }
 
 
-                System.out.println("_______________________________________________________________________");
+                /*System.out.println("_______________________________________________________________________");
                 System.out.println("LOCATION REPORTS REGARDING "+user+" REQUEST BY HA");
-                System.out.println("BIG BROTHER IS REQUESTING");
+                System.out.println("BIG BROTHER IS REQUESTING");*/
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 for(int i = 0; i < clientReports.size();i++){
                     if(!clientReports.get(i).getUsername().toUpperCase().equals(user.toUpperCase())){
@@ -487,8 +540,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         i--;
                     }
                 }
-                System.out.println("REQUEST SIZE "+clientReports.size());
-                System.out.println("REQUEST COMPLETE");
+                cleanRepetition(clientReports,1);
+                /*System.out.println("REQUEST SIZE "+clientReports.size());
+                System.out.println("REQUEST COMPLETE");*/
 
                 //Get time
                 String time = java.time.LocalTime.now().toString();
@@ -526,13 +580,14 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
 
                     //get client private key
-                    FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+                    /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                     byte[] encoded1 = new byte[fis0.available()];
                     fis0.read(encoded1);
                     fis0.close();
                     PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
                     KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);*/
+                    PrivateKey priv = loadPrivKey("server");
 
                     //Hash message
                     byte[] messageByte0 = s1.getBytes();
@@ -549,8 +604,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
                     finalS = "time: " + time + " | signature: " + signedHash;
-                }
-                catch (NoSuchAlgorithmException e) {
+                } catch (NoSuchAlgorithmException e) {
                     e.printStackTrace();
                 } catch (InvalidKeyException e) {
                     e.printStackTrace();
@@ -558,13 +612,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     e.printStackTrace();
                 } catch (BadPaddingException e) {
                     e.printStackTrace();
-                } catch (InvalidKeySpecException e) {
-                    e.printStackTrace();
                 } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
                     e.printStackTrace();
                 }
 
@@ -576,7 +624,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn[0];
     }
 
-    public ServerReturn obtainUsersAtLocation(String user, String pos, String epoch) throws InterruptedException{
+    public ServerReturn obtainUsersAtLocation(String pos, String epoch) throws InterruptedException{
 
         int[] ep = {-1};
         int[] posi = {-1, -1};
@@ -592,7 +640,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 try {
                     Cipher cipher = null;
                     cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
+                    cipher.init(Cipher.DECRYPT_MODE, symKey.get("hauser"));
 
                     byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
                     byte[] chunk2 = cipher.doFinal(hashBytes3);
@@ -615,9 +663,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 }
 
 
-                System.out.println("_______________________________________________________________________");
+                /*System.out.println("_______________________________________________________________________");
                 System.out.println("ALL LOCATION REPORTS FOR POSITION ("+ positionDec[0] +","+ positionDec[1] +") AT EPOCH "+ep[0]+" REQUEST BY HA");
-                System.out.println("BIG BROTHER IS REQUESTING");
+                System.out.println("BIG BROTHER IS REQUESTING");*/
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 for(int i = 0; i < clientReports.size();i++){
                     if(clientReports.get(i).getPosY() != posi[1]){
@@ -634,8 +682,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     }
                 }
                 cleanRepetition(clientReports,0);
-                System.out.println("REQUEST SIZE "+clientReports.size());
-                System.out.println("REQUEST COMPLETE");
+                /*System.out.println("REQUEST SIZE "+clientReports.size());
+                System.out.println("REQUEST COMPLETE");*/
 
                 //Get time
                 String time = java.time.LocalTime.now().toString();
@@ -647,7 +695,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 try {
 
                     Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(user));
+                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("hauser"));
 
                     Iterator i = clientReports.iterator();
                     while (i.hasNext()) {
@@ -673,13 +721,15 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
 
                     //get client private key
-                    FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
+                    /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                     byte[] encoded1 = new byte[fis0.available()];
                     fis0.read(encoded1);
                     fis0.close();
                     PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
                     KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);*/
+
+                    PrivateKey priv = loadPrivKey("server");
 
                     //Hash message
                     byte[] messageByte0 = s1.getBytes();
@@ -696,8 +746,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
                     finalS = "time: " + time + " | signature: " + signedHash;
-                }
-                catch (NoSuchAlgorithmException e) {
+                } catch (NoSuchAlgorithmException e) {
                     e.printStackTrace();
                 } catch (InvalidKeyException e) {
                     e.printStackTrace();
@@ -705,13 +754,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     e.printStackTrace();
                 } catch (BadPaddingException e) {
                     e.printStackTrace();
-                } catch (InvalidKeySpecException e) {
-                    e.printStackTrace();
                 } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
                     e.printStackTrace();
                 }
 
@@ -751,6 +794,19 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     if(list.get(i).getUsername().equals(list.get(j).getUsername())){
                         list.remove(j);
                         j--;
+                    }
+                }
+            }
+        }else if(op == 1){
+            for (int i = 0; i < list.size(); i++) {
+                for(int j = i+1; j < list.size(); j++){
+                    if(list.get(i).getUsername().equals(list.get(j).getUsername())){
+                        if(list.get(i).getPosX() == list.get(j).getPosX()){
+                            if(list.get(i).getPosY() == list.get(j).getPosY()){
+                                list.remove(j);
+                                j--;
+                            }
+                        }
                     }
                 }
             }
@@ -851,13 +907,16 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private String verifyLocationReport(ClientInterface c,String user, Report locationReport) {
         //witness signature
         try {
-            FileInputStream fis1 = new FileInputStream("src/keys/" + locationReport.getWitness() + "Pub.key");
+            /*FileInputStream fis1 = new FileInputStream("src/keys/" + locationReport.getWitness() + "Pub.key");
             byte[] decoded1 = new byte[fis1.available()];
             fis1.read(decoded1);
             fis1.close();
             X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
             KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
             PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+             */
+            PublicKey pub = loadPublicKey(locationReport.getWitness());
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, pub);
@@ -877,13 +936,16 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             }
 
             //User Signature
-            FileInputStream fis2 = new FileInputStream("src/keys/" + locationReport.getUsername() + "Pub.key");
+            /*FileInputStream fis2 = new FileInputStream("src/keys/" + locationReport.getUsername() + "Pub.key");
             byte[] decoded2 = new byte[fis2.available()];
             fis2.read(decoded2);
             fis2.close();
             X509EncodedKeySpec publicKeySpecUser = new X509EncodedKeySpec(decoded2);
             KeyFactory keyFacPubUser = KeyFactory.getInstance("RSA");
             PublicKey pubClient = keyFacPubUser.generatePublic(publicKeySpecUser);
+
+             */
+            PublicKey pubClient = loadPublicKey(locationReport.getUsername());
 
             rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, pubClient);
@@ -928,10 +990,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 e.printStackTrace();
             }
 
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (InvalidKeySpecException e) {
-            e.printStackTrace();
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (BadPaddingException e) {
@@ -944,8 +1002,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             return "Error";
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
         } catch (IllegalBlockSizeException e) {
             e.printStackTrace();
         }
@@ -956,7 +1012,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public static void main(String args[]) {
         try {
-            Server server = new Server();
+            Server server = new Server(5);
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         } catch (NotBoundException e) {
