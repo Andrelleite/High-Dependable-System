@@ -23,14 +23,14 @@ class Simulation{
     private Server server;
     private List<Thread> workers;
 
-    public Simulation(Map<String,Integer> clientEpochs, List<Client> clients) throws IOException, NotBoundException, InterruptedException, ClassNotFoundException {
+    public Simulation(Map<String,Integer> clientEpochs, List<Client> clients, int filenumber) throws IOException, NotBoundException, InterruptedException, ClassNotFoundException {
         this.byzantines = new ArrayList<>();
         this.authorities = new ArrayList<>();
         this.workers = new ArrayList<>();
         this.clientEpochs = clientEpochs;
         this.clients = clients;
         this.epoch = "0";
-        simulate();
+        simulate("simulate"+filenumber);
     }
 
     private void startServer() throws NotBoundException, IOException, ClassNotFoundException {
@@ -266,11 +266,11 @@ class Simulation{
 
     }
 
-    private void simulate() throws IOException, NotBoundException, InterruptedException, ClassNotFoundException {
+    private void simulate(String file) throws IOException, NotBoundException, InterruptedException, ClassNotFoundException {
 
         int flag = 0;
         int lineCounter = 0;
-        File simulation = new File("src/grid/simulate2.txt");
+        File simulation = new File("src/grid/"+file+".txt");
         Scanner reader = new Scanner(simulation);
         System.out.println("====================== SIMULATION HAS STARTED ======================");
         while (reader.hasNextLine() && flag == 0) {
@@ -338,7 +338,8 @@ public class Application {
         List<String> clientsWithError = new ArrayList<>();
         Map<String, Integer> initClients = new HashMap<String, Integer>();
         LocateRegistry.createRegistry(7001);
-
+        int filenumber;
+        
         /* Load epochs and users*/
         try {
             File myObj = new File("src/grid/grid1.txt");
@@ -360,64 +361,12 @@ public class Application {
             System.out.println("An error occurred.");
             e.printStackTrace();
         }
+        
+        System.out.print("NUMBER OF SIMULATION: ");
+        Scanner scan = new Scanner(System.in);
+        filenumber = scan.nextInt();
 
         Simulation simulation = new Simulation(initClients,clientsList);
         System.exit(1);
-
-        System.out.println(initClients.entrySet());
-        //fim da ultima epoch
-        while(epoch <= lastEpoch){
-            if(initClients.containsValue(epoch)){
-                int finalEpoch = epoch; //to use epoch in lambda expression
-                initClients.forEach((key, value) -> {
-                    if(finalEpoch == value) {
-                        try {
-                            Client client = new Client();
-                            String url = "rmi://127.0.0.1:7001/" + key;
-                            rebind(url, client);
-                            client.setUsername(key);
-                            ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + key);
-                            client.setClientInterface(h);
-                            System.out.println("->>>>>>>>> " + client.getClientInterface());
-                            client.loadMoves();
-                            clientsList.add(client);
-                            System.out.println("new client added : " + key);
-                        } catch (RemoteException | MalformedURLException | NotBoundException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-            }
-            System.out.println("\nEpoch : " + epoch + "\n");
-            Iterator<Client> itr = clientsList.iterator();
-            while (itr.hasNext()) {
-                Client client = itr.next();
-                if (client.getHasError() == 1) {
-                    itr.remove();
-                    clientsWithError.add(client.getUsername());
-                    /*try {
-                        unbind("rmi://127.0.0.1:7001/" + client.getUsername());
-                    } catch (RemoteException | NotBoundException | MalformedURLException e) {
-                        e.printStackTrace();
-                    }*/
-                }else{
-                    client.setClientsWithError(clientsWithError);
-                    client.setEpoch(epoch);
-                }
-            }
-            Iterator<Client> itr1 = clientsList.iterator();
-            while (itr1.hasNext()) {
-                Client client = itr1.next();
-                client.setRequestLocationProof();
-            }
-
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            epoch += 1;
-            clientsWithError.clear();
-        }
     }
 }
