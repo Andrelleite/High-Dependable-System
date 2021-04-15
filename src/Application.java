@@ -1,6 +1,4 @@
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
@@ -8,6 +6,7 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.ExportException;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static java.rmi.Naming.*;
@@ -328,7 +327,65 @@ class Simulation{
 }
 
 
+
 public class Application {
+
+
+    public static void gridGenerator(int u, int number, int maxEpochs, int gridLimit){
+
+        String dir = "src/grid/grid"+number+".txt";
+        Random random;
+        FileWriter fw = null;
+        BufferedWriter bw = null;
+        PrintWriter out = null;
+        PrintWriter writer = null;
+        int x,y;
+
+        try {
+
+            /*File Initializer*/
+            writer = new PrintWriter(dir, "UTF-8");
+            writer.print("");
+            writer.close();
+
+            /*File Information Addition*/
+            fw = new FileWriter(dir, true);
+            bw = new BufferedWriter(fw);
+            out = new PrintWriter(bw);
+            for(int j = 0; j <= maxEpochs; j++){
+                random = new Random(j+25);
+                for(int i = 0; i < u; i++){
+                    x = random.nextInt(gridLimit);
+                    y = random.nextInt(gridLimit);
+                    if(j == maxEpochs && i+1 == u){
+                        out.print("user"+(i+1)+", "+j+", "+x+", "+y);
+                    }else{
+                        out.println("user"+(i+1)+", "+j+", "+x+", "+y);
+                    }
+                }
+            }
+            out.close();
+        } catch (IOException e) {
+            /*Handler for exception*/
+        }
+        finally {
+            if(out != null)
+                out.close();
+            try {
+                if(bw != null)
+                    bw.close();
+            } catch (IOException e) {
+                /*Handler for exception*/
+            }
+            try {
+                if(fw != null)
+                    fw.close();
+            } catch (IOException e) {
+                /*Handler for exception*/
+            }
+        }
+
+    }
 
     public static void main(String[] args) throws InterruptedException, IOException, ClassNotFoundException, NotBoundException {
 
@@ -339,6 +396,8 @@ public class Application {
         Map<String, Integer> initClients = new HashMap<String, Integer>();
         LocateRegistry.createRegistry(7001);
         int filenumber;
+
+        //gridGenerator(5,3,2,40);
         
         /* Load epochs and users*/
         try {
@@ -355,18 +414,18 @@ public class Application {
                 }
 
             }
-            System.out.println(lastEpoch);
             reader.close();
         } catch (FileNotFoundException e) {
             System.out.println("An error occurred.");
             e.printStackTrace();
         }
-        
+
         System.out.print("NUMBER OF SIMULATION: ");
         Scanner scan = new Scanner(System.in);
         filenumber = scan.nextInt();
 
-        Simulation simulation = new Simulation(initClients,clientsList);
+        Simulation simulation = new Simulation(initClients,clientsList,filenumber);
         System.exit(1);
+
     }
 }

@@ -145,8 +145,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
     }
 
-
     public void subscribe(ClientInterface c, String user, String key) throws RemoteException{
+
         this.allSystemUsers.put(user,0.0);
         try {
             updateUsers();
@@ -172,7 +172,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
 
             this.symKey.put(user,originalKey);
-
             System.out.println("lado do server: " + encodedKey);
 
 
@@ -905,6 +904,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
         File file = new File("ClientReports.txt");
         File fileu = new File("SystemUsers.txt");
+        File files = new File("SymKeys.txt");
 
         if (file.length() == 0){
             this.reps = new ArrayList<>();
@@ -916,9 +916,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             this.reps = (ArrayList<Report>) ois.readObject();
             System.out.println("LOAD SUCCESSFUL");
             System.out.println("SIZE OF LOAD "+this.reps.size());
-            for (Report entry : this.reps) {
-                System.out.println(entry.getUsername() +" ("+entry.getPosX()+","+entry.getPosY()+") "+entry.getEpoch());
-            }
             ois.close();
         }
 
@@ -932,12 +929,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             this.allSystemUsers = (HashMap<String, Double>) ois.readObject();
             System.out.println("LOAD SUCCESSFUL");
             System.out.println("SIZE OF LOAD "+this.allSystemUsers.size());
-            for (String key : this.allSystemUsers.keySet()) {
-                System.out.println("Interface: "+key+" is "+this.allSystemUsers.get(key));
-            }
             ois.close();
         }
-
 
     }
 
