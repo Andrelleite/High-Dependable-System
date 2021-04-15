@@ -310,7 +310,11 @@ class Simulation{
                     }
                 };
                 worker.start();
-                this.workers.add(worker);
+                if(line.split(",")[0].equals("generateproofs")){
+                    worker.join();
+                }else{
+                    this.workers.add(worker);
+                }
                 Thread.sleep(1000);
             }
 

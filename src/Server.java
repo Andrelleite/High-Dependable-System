@@ -399,19 +399,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         Thread worker = new Thread("Worker") {
             @Override
             public void run() {
+                int flag = 0;
                 filer.appendInformation("[REPORT REQUEST] NEW REPORT DELIVERY REQUEST =====");
                 try{
-                    //get server private key
-                    /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
-                    byte[] encoded1 = new byte[fis0.available()];
-                    fis0.read(encoded1);
-                    fis0.close();
-                    PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
-                    KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
-
-                    Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    rsaCipher.init(Cipher.DECRYPT_MODE, priv);*/
 
                     Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
                     cipher.init(Cipher.DECRYPT_MODE, symKey.get(username));
@@ -427,69 +417,81 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 }
                 catch (NoSuchAlgorithmException e) {
                     filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR1");
+                    System.out.println("!REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR1");
+                    flag = 1;
                 }catch (NoSuchPaddingException e) {
                     filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR2");
+                    System.out.println("!REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR2");
+                    flag = 1;
                 } catch (InvalidKeyException e) {
                     filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR3");
+                    System.out.println("!REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR3");
+                    flag = 1;
                 } catch (IllegalBlockSizeException e) {
                     filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR4");
+                    System.out.println("!REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR4");
+                    flag = 1;
                 } catch (BadPaddingException e) {
                     filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR5");
+                    System.out.println("!REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR5");
+                    flag = 1;
                 }
+
 
                 ArrayList<Report> reports = null;
 
-                if(ep[0] !=-1){
-                    reports = fetchReports(c, ep[0]);
-                }
-
-                //Get time
-                String time = java.time.LocalTime.now().toString();
-
-                String s1 = username + time + ep[0];
-
-                String finalS = "";
-
-                ArrayList<Report> returnReport = new ArrayList<>();
-
-                try {
-                    Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(username));
-                    filer.appendInformation("===== NEW REPORT DELIVERY REQUEST FROM "+username+" =====");
-
-                    if(reports != null){
-                        Iterator i = reports.iterator();
-                        while (i.hasNext()) {
-                            Report r = (Report) i.next();
-
-                            String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
-                            //r.setEpoch(-1);
-                            //r.setPosX(-1);
-                            //r.setPosY(-1);
-
-                            byte[] infoBytes = Base64.getDecoder().decode(info);
-                            byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
-                            String loc = Base64.getEncoder().encodeToString(cipherBytes1);
-
-                            //r.setEncryptedInfo(loc);
-
-                            //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
-                            byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
-                            String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
-
-                            Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessTimeStamp(),r.getWitnessPos());
-                            n.setEncryptedInfo(loc);
-
-                            returnReport.add(n);
-
-                            //r.setWitness(loc3);
-                        }
-                    }else{
-                        filer.appendInformation("\t\t NO FETCH FOR "+username);
+                if(flag==0){
+                    if(ep[0] !=-1){
+                        reports = fetchReports(c, ep[0]);
                     }
 
+                    //Get time
+                    String time = java.time.LocalTime.now().toString();
 
-                    //get server private key
+                    String s1 = username + time + ep[0];
+
+                    String finalS = "";
+
+                    ArrayList<Report> returnReport = new ArrayList<>();
+
+                    try {
+                        Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                        cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(username));
+                        filer.appendInformation("===== NEW REPORT DELIVERY REQUEST FROM "+username+" =====");
+
+                        if(reports != null){
+                            Iterator i = reports.iterator();
+                            while (i.hasNext()) {
+                                Report r = (Report) i.next();
+
+                                String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+                                //r.setEpoch(-1);
+                                //r.setPosX(-1);
+                                //r.setPosY(-1);
+
+                                byte[] infoBytes = Base64.getDecoder().decode(info);
+                                byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                                String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                                //r.setEncryptedInfo(loc);
+
+                                //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                                byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
+                                String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+                                Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessTimeStamp(),r.getWitnessPos());
+                                n.setEncryptedInfo(loc);
+
+                                returnReport.add(n);
+
+                                //r.setWitness(loc3);
+                            }
+                        }else{
+                            filer.appendInformation("\t\t NO FETCH FOR "+username);
+                        }
+
+
+                        //get server private key
                     /*
                     FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                     byte[] encoded1 = new byte[fis0.available()];
@@ -498,43 +500,49 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
                     KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
                     PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
-
                      */
 
-                    PrivateKey priv = loadPrivKey("server");
+                        PrivateKey priv = loadPrivKey("server");
 
-                    //Hash message
-                    byte[] messageByte0 = s1.getBytes();
-                    MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
-                    digest0.update(messageByte0);
-                    byte[] digestByte0 = digest0.digest();
-                    String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+                        //Hash message
+                        byte[] messageByte0 = s1.getBytes();
+                        MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                        digest0.update(messageByte0);
+                        byte[] digestByte0 = digest0.digest();
+                        String digest64 = Base64.getEncoder().encodeToString(digestByte0);
 
-                    //sign the hash with the client's private key
-                    Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    cipherHash.init(Cipher.ENCRYPT_MODE, priv);
-                    byte[] hashBytes = Base64.getDecoder().decode(digest64);
-                    byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
-                    String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+                        //sign the hash with the client's private key
+                        Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                        cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+                        byte[] hashBytes = Base64.getDecoder().decode(digest64);
+                        byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+                        String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
-                    finalS = "time: " + time + " | signature: " + signedHash;
-                    filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
-                    filer.appendInformation("\t\t SIGNATURE: " + signedHash);
+                        finalS = "time: " + time + " | signature: " + signedHash;
+                        filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
+                        filer.appendInformation("\t\t SIGNATURE: " + signedHash);
+                    }
+                    catch (NoSuchAlgorithmException e) {
+                        filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR6");
+                    } catch (InvalidKeyException e) {
+                        filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR7");
+                    } catch (NoSuchPaddingException e) {
+                        filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR8");
+                    } catch (BadPaddingException e) {
+                        filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR9");
+                    } catch (IllegalBlockSizeException e) {
+                        filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR10");
+                    }
+
+                    serverReturn[0] = new ServerReturn(finalS,returnReport);
+                    filer.appendInformation("\t\t\t REQUEST COMPLETE FOR "+username);
                 }
-                catch (NoSuchAlgorithmException e) {
-                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR6");
-                } catch (InvalidKeyException e) {
-                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR7");
-                } catch (NoSuchPaddingException e) {
-                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR8");
-                } catch (BadPaddingException e) {
-                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR9");
-                } catch (IllegalBlockSizeException e) {
-                    filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR10");
+
+                else{
+                    serverReturn[0] = new ServerReturn(null,null);
                 }
 
-                serverReturn[0] = new ServerReturn(finalS,returnReport);
-                filer.appendInformation("\t\t\t REQUEST COMPLETE FOR "+username);
+
 
             }
         };

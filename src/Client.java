@@ -742,6 +742,12 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
             ServerReturn r = s.obtainLocationReport(this.getClientInterface(),loc3,this.getUsername());
 
+            if(r.getReports() == null || r.getServerProof() == null){
+                this.fileMan.appendInformation(" [REQUEST TO SERVER]  MY REPORTS");
+                this.fileMan.appendInformation(" [REQUEST TO SERVER]  DENIED");
+                return;
+            }
+
             /*FileInputStream fis0 = new FileInputStream("src/keys/"+this.getUsername()+"Priv.key");
             byte[] encoded1 = new byte[fis0.available()];
             fis0.read(encoded1);
@@ -759,6 +765,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             String serverSignature = r.getServerProof();
 
             String timeServer = serverSignature.split(" ")[1];
+
 
             try{
                 LocalTime signServerTime = LocalTime.parse(timeServer);
