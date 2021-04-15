@@ -439,33 +439,37 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(username));
                     filer.appendInformation("===== NEW REPORT DELIVERY REQUEST FROM "+username+" =====");
 
+                    if(reports != null){
+                        Iterator i = reports.iterator();
+                        while (i.hasNext()) {
+                            Report r = (Report) i.next();
 
-                    Iterator i = reports.iterator();
-                    while (i.hasNext()) {
-                        Report r = (Report) i.next();
+                            String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+                            //r.setEpoch(-1);
+                            //r.setPosX(-1);
+                            //r.setPosY(-1);
 
-                        String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
-                        //r.setEpoch(-1);
-                        //r.setPosX(-1);
-                        //r.setPosY(-1);
+                            byte[] infoBytes = Base64.getDecoder().decode(info);
+                            byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                            String loc = Base64.getEncoder().encodeToString(cipherBytes1);
 
-                        byte[] infoBytes = Base64.getDecoder().decode(info);
-                        byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
-                        String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+                            //r.setEncryptedInfo(loc);
 
-                        //r.setEncryptedInfo(loc);
+                            //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                            byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
+                            String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
 
-                        //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
-                        byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
-                        String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+                            Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessTimeStamp(),r.getWitnessPos());
+                            n.setEncryptedInfo(loc);
 
-                        Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessTimeStamp(),r.getWitnessPos());
-                        n.setEncryptedInfo(loc);
+                            returnReport.add(n);
 
-                        returnReport.add(n);
-
-                        //r.setWitness(loc3);
+                            //r.setWitness(loc3);
+                        }
+                    }else{
+                        filer.appendInformation("\t\t NO FETCH FOR "+username);
                     }
+
 
                     //get server private key
                     /*

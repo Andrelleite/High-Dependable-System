@@ -84,6 +84,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         return symKey;
     }
 
+    public OutputManager getFileMan(){ return this.fileMan; }
+
     public void setSymKey(SecretKey symKey) {
         this.symKey = symKey;
     }
@@ -209,7 +211,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     public void setUsername(String username,String origin){
         this.username = username;
-
     }
 
     public Client() throws RemoteException {
@@ -301,7 +302,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
         return null;
     }
-
 
     public Report generateLocationReportWitness(ClientInterface c, String username, int userEpoch) throws RemoteException{
         try {
@@ -491,28 +491,29 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         ArrayList<String> usersToContact = findUser();
         Report message = null;
         String serverSignature = "";
-
+        this.fileMan.appendInformation(" [REQUEST TO SERVER]  PROOF OF LOCATION");
         if(usersToContact.size() != 0){
             Iterator i = usersToContact.iterator();
             while (i.hasNext()) {
                 String userToContact = (String) i.next();
-                System.out.println(this.username + " trying to contact " + userToContact);
+                this.fileMan.appendInformation("\t\t"+this.username + " trying to contact " + userToContact);
                 try {
                     ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + userToContact);
                     message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.getEpoch());
                     if(message == null){
-                        System.out.println("report is null");
+
+                        this.fileMan.appendInformation("\t\t\treport is null");
                         return;
                     }
 
                     if(message.getC() != this.getClientInterface() && !message.getUsername().equals(this.getUsername()) && message.getEpoch() != this.epoch && !message.getWitness().equals(userToContact)){
-                        System.out.println("report don't pass");
+                        this.fileMan.appendInformation("\t\t\treport don't pass");
                         return;
                     }
 
                     String verifyRet = verifyWitnessSignature(message, h);
                     if(verifyRet.equals(("Error"))){
-                        System.out.println("report witness signature is wrong");
+                        this.fileMan.appendInformation("\t\t\treport witness signature is wrong");
                         return;
                     }
 
@@ -528,7 +529,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         //4 segundos para possíveis atrasos na rede
                         LocalTime clientTimeThreshold = clientTime.plusSeconds(4);
                         if(clientTimeThreshold.compareTo(witTime) < 0){
-                            System.out.println("Possilble replay attack");
+                            this.fileMan.appendInformation("\t\t\tPossilble replay attack");
                             return;
                         }
                     }
@@ -605,7 +606,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     try{
                         ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
                         serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
-                        System.out.println("->>>>>> SERVER SIGNATURE:" + serverSignature);
+                        this.fileMan.appendInformation("\t\tSERVER SIGNATURE:" + serverSignature);
                     } catch (ConnectException ev){
                         try {
                             serverSignature = retry(this.getClientInterface(),this.getUsername(),message);
@@ -628,9 +629,9 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     }
 
                     if(serverSignature.equals("")){
-                        System.out.println("SOMETHING WRONG HAPPENED, NO RETURN FROM THE SERVER");
+                        this.fileMan.appendInformation("\t\tSOMETHING WRONG HAPPENED, NO RETURN FROM THE SERVER");
                     }else if(serverSignature.equals("null")){
-                        System.out.println("SOMETHING WRONG HAPPENED, RETURN NOT SIGNED");
+                        this.fileMan.appendInformation("\t\tSOMETHING WRONG HAPPENED, RETURN NOT SIGNED");
                     }else {
                         String timeServer = serverSignature.split(" ")[1];
 
@@ -640,12 +641,12 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             //4 segundos para possíveis atrasos na rede
                             LocalTime timeNowThreshold = timeNow.plusSeconds(4);
                             if(timeNowThreshold.compareTo(signServerTime) < 0){
-                                System.out.println("Possilble replay attack");
+                                this.fileMan.appendInformation("\t\t\tPossilble replay attack");
                                 return;
                             }
                         }
                         catch (DateTimeParseException e) {
-                            System.out.println("Malformed Return");
+                            this.fileMan.appendInformation("\t\t\tMalformed Return");
                             e.printStackTrace();
                         }
 
@@ -664,14 +665,14 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     }
 
                 } catch (Exception e) {
-                    System.out.println( userToContact + " nao foi encontrado");
+                    this.fileMan.appendInformation( "\t\t"+userToContact + " NOT FOUND.");
                     System.out.println("Exception in main: " + e);
                     e.printStackTrace();
                 }
             }
         }
         else{
-            System.out.println(this.getUsername() + " não tem users perto.");
+            this.fileMan.appendInformation("\t\t"+this.getUsername() + " DOESN'T HAVE ANY USERS NEARBY. IT'S SAD, BUT YOU ARE ALONE.");
         }
 
     }
@@ -714,7 +715,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         }
         return "Correct";
     }
-
 
     public void getReports(String ep) throws RemoteException{
 
