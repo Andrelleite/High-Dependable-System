@@ -264,7 +264,7 @@ class Simulation{
         }else if(request.startsWith("user")){
             if(origin.equals("ha")){
                 user = regex.split(",")[1];
-                this.authorities.get(0).handshake(2,user,"0","0",generated[2]);
+                this.authorities.get(0).communicate(this.authorities.get(0).getServerInterface(),2,user,"0","0",generated[2]);
                 System.out.println("HA is requesting "+user+" location.");
             }
         }else if(request.equals("position")){
@@ -273,7 +273,7 @@ class Simulation{
             epoch = regex.split(",")[4];
             if(origin.equals("ha")){
                 System.out.println("HA is requesting users history at this location: ("+x+","+y+") at epoch "+ epoch);
-                this.authorities.get(0).handshake(1,"none",x,y,epoch);
+                this.authorities.get(0).communicate(this.authorities.get(0).getServerInterface(),1,"",x,y,generated[2]);
             }
         }else if(request.equals("down")){
             System.out.println("Simulate Server Crash or Connection drop.");
@@ -284,7 +284,7 @@ class Simulation{
             startServer();
             setClientsName();
             server.setClients(clientsName);
-
+            server.loadSymmetricKeys();
         }else if(origin.equals("spy")){
             if(request.equals("report")){
                 spyOnReports(generated[2],generated[3],generated[4]);
@@ -315,6 +315,7 @@ class Simulation{
                 this.ha = setValue(line);
                 HAClient ha = new HAClient();
                 this.authorities.add(ha);
+                this.authorities.get(0).handshake();
             }else if(lineCounter < this.f+3){
                 setByzantines(line);
             }else if(line.equals("endsim")){

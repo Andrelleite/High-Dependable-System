@@ -69,7 +69,7 @@ public class HAClient extends Thread{
         return null;
     }
 
-    public void handshake(int op,String user,String x, String y, String epoch){
+    public void handshake(){
         try {
             try {
                 this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
@@ -95,9 +95,8 @@ public class HAClient extends Thread{
                 String encryptedKey = Base64.getEncoder().encodeToString(cipherBytes);
 
                 h.HASubscribe(encryptedKey);
-                communicate(this.h, op,user,x,y,epoch);
             }catch (RemoteException | MalformedURLException | NotBoundException e){
-                retry(op,user,x,y,epoch);
+                /*Handled with care*/
             }
         } catch (Exception e) {
             System.out.println("Exception in main: " + e);
@@ -105,7 +104,7 @@ public class HAClient extends Thread{
         }
     }
 
-    private void communicate(ServerInterface h, int op,String user,String x, String y, String epoch) throws IOException, ClassNotFoundException {
+    public void communicate(ServerInterface h, int op,String user,String x, String y, String epoch) throws IOException, ClassNotFoundException {
 
         ArrayList<Report> reports;
         System.setProperty("java.rmi.transport.tcp.responseTimeout", "2000");
@@ -292,11 +291,15 @@ public class HAClient extends Thread{
         }
     }
 
+    public ServerInterface getServerInterface(){
+        return this.h;
+    }
+
     //====================================MAIN==========================================================================
 
     public static void main(String[] args) throws NotBoundException, IOException, ClassNotFoundException {
         HAClient ha = new HAClient();
-        ha.handshake(1,"","30","37","0");
-        ha.handshake(1,"","30","37","0");
+        //ha.handshake(1,"","30","37","0");
+        //ha.handshake(1,"","30","37","0");
     }
 }

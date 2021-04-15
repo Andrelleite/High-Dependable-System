@@ -44,10 +44,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         this.fileMan = new OutputManager("Server","Server");
         this.fileMan.initFile();
         synchronize(); // Updates the reports in list to the latest in file
-        if(clients != null){
-            loadSymmKeys(clients);
-            System.out.println(symKey);
-        }
         this.server = retryConnection(7000);
         if (!imPrimary) {
             checkPrimaryServer(this.server);
@@ -56,6 +52,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public void setClients(List<String> clients) {
         this.clients = clients;
+    }
+
+    public void loadSymmetricKeys() {
+        if(clients != null){
+            loadSymmKeys(clients);
+        }
     }
 
     private void checkPrimaryServer(ServerInterface serverPrimary) {
@@ -137,7 +139,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
 
             String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
-
             this.symKey.put("ha",originalKey);
             StoreKeysToKeyStore(originalKey, "ha","KeyStore","src/keys/aes-ha.keystore");
 
