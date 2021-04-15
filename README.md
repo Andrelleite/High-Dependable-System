@@ -25,12 +25,14 @@ user3, 2, 10, 15
 user4, 2, 30, 37
 ```
 
+***NOTE: Make sure all users have defined locations, even though they are stationary. ***
+
 It is important to know that the file **simulate.txt** will set the behaviour of this application.
 You can change this behaviour following this file type of construct.
 In the beggining of the file should always be set as follows:
 
 ```
-f,[number of byzantine users]
+f,[number of byzantine users],[f line < f]
 u,[number of users]
 ha,[number of healthcare authorities]
 user[x],b
@@ -71,10 +73,21 @@ This instructions are different for pratical reasons and we will define them for
 4. **ha,user[x],[epoch]** : Health Authority generates a request for location proof of user[x] at epoch [epoch];
 5. **ha,position,x,y,[epoch]** : Health Authority generates a request for all location proof located at (x,y) at the instance [epoch];
 6. **server,[down|up]** : Simulates Server crash or forced drop. **down** simulates the connection fault, **up** reconnects the server;
-7. **spy,registry,user[x],user[y]** : TO BE DETERMINED
-8. **spy,reports,user[x],user[y]** : TO BE DETERMINED
+7. **spy,reports,user[x],user[y]** : Simulates a byzantine user trying to access other user reports;
 
+## Output Files
+
+  All outputs generated will be stored at files regarding every instance in the application. 
+  For the purpose of organized information and readable content, they are created at the start of each of this instances and are not final. It's just expected the changes to persist until the next application run.
+  They are located at this directory:
+  
+  -> **C:\...\High-Dependable-System\output\ ...**
 
 ## Running Files
 
+To easily run the application, first make sure you followed the next Steps:
 
+1. Setup file **grid.txt** with all moves to perform;
+2. Setup file **simulate.txt** or select on from the existent;
+3. Run **Application.java**
+4. Check the outputs at */outputs*;
