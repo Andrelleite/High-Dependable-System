@@ -76,7 +76,6 @@ public class HAClient extends Thread{
 
                 SecretKey secretKey = KeyGenerator.getInstance("AES").generateKey();
                 String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
-                System.out.println("lado do ha client: " + encodedKey);
                 this.setSymKey(secretKey);
 
                 /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");

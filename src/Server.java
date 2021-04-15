@@ -412,8 +412,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                     ep[0] = Integer.parseInt(parse);
 
-                    System.out.println("->>>> " + ep[0]);
-
                 }
                 catch (NoSuchAlgorithmException e) {
                     filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR1");
@@ -588,13 +586,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException e) {
                     e.printStackTrace();
                 }
-                System.out.println("bruh ->> " + ep[0] + " " + userFinal );
 
 
                 filer.appendInformation("[HA USER REQUEST] HA REQUESTING "+userFinal+" LOCATION REPORTS AT EPOCH "+epochFinal+" ===== ");
 
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
-                System.out.println("->>>>"+clientReports.size());
                 for(int i = 0; i < clientReports.size();i++){
                     System.out.println(clientReports.get(i).getUsername());
                     if(!clientReports.get(i).getUsername().equals(userFinal)){
@@ -732,8 +728,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     byte[] hashBytes4 = java.util.Base64.getDecoder().decode(pos);
                     byte[] chunk3 = cipher.doFinal(hashBytes4);
                     String position =  new String(chunk3, UTF_8);
-
-                    System.out.println("bruh " + position);
 
                     positionDec[0] = position.split(",")[0];
                     positionDec[1] = position.split(",")[1];

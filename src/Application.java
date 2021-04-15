@@ -270,7 +270,7 @@ class Simulation{
 
         int flag = 0;
         int lineCounter = 0;
-        File simulation = new File("src/grid/simulate.txt");
+        File simulation = new File("src/grid/simulate2.txt");
         Scanner reader = new Scanner(simulation);
         System.out.println("====================== SIMULATION HAS STARTED ======================");
         while (reader.hasNextLine() && flag == 0) {
