@@ -366,7 +366,7 @@ public class Application {
         Scanner scan = new Scanner(System.in);
         filenumber = scan.nextInt();
 
-        Simulation simulation = new Simulation(initClients,clientsList);
+        Simulation simulation = new Simulation(initClients,clientsList,filenumber);
         System.exit(1);
     }
 }
