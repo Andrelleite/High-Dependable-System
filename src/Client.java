@@ -59,6 +59,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     private Map<Integer, Pair<Integer,Integer>> moveList = new HashMap<Integer, Pair<Integer,Integer>>();
     private List<String> clientsWithError = new ArrayList<String>();
     private OutputManager fileMan;
+    private int gridNumber;
 
     public Map<Integer, Pair<Integer, Integer>> getMoveList() {
         return moveList;
@@ -213,8 +214,13 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         this.username = username;
     }
 
-    public Client() throws RemoteException {
+    public Client(int grid) throws RemoteException {
         super();
+        this.gridNumber = grid;
+    }
+
+    public int getGridNumber(){
+        return this.gridNumber;
     }
 
     public String echo(String message) throws RemoteException {
@@ -232,7 +238,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     public void loadMoves() {
         try {
             //coordenadas falsas
-            File myObj = new File("src/grid/grid3.txt");
+            int grid = getGridNumber();
+            File myObj = new File("src/grid/grid"+grid+".txt");
             Scanner reader = new Scanner(myObj);
             while (reader.hasNextLine()) {
                 String data = reader.nextLine();
@@ -305,7 +312,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     public Report generateLocationReportWitness(ClientInterface c, String username, int userEpoch) throws RemoteException{
         try {
-            File myObj = new File("src/grid/grid3.txt");
+            int grid = getGridNumber();
+            File myObj = new File("src/grid/grid"+grid+".txt");
             Scanner reader = new Scanner(myObj);
             while (reader.hasNextLine()) {
                 String data = reader.nextLine();
@@ -395,7 +403,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     public ArrayList<String> findUser() {
         ArrayList<String> usersNearby = new ArrayList<>();
         try {
-            File myObj = new File("src/grid/grid3.txt");
+            int grid = getGridNumber();
+            File myObj = new File("src/grid/grid"+grid+".txt");
             Scanner reader = new Scanner(myObj);
             while (reader.hasNextLine()) {
                 String data = reader.nextLine();

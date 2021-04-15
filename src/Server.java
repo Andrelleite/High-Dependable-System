@@ -32,18 +32,23 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private boolean imPrimary;
     private String IPV4;
     private int portRMI;
-    private int f;
+    private int[] f;
 
     //=======================CONNECTION=================================================================================
 
-    public Server(int f) throws IOException, NotBoundException, ClassNotFoundException {
-        this.f = f;
+    public Server(int f, int fline) throws IOException, NotBoundException, ClassNotFoundException {
+
+        this.f = new int[2];
+        this.f[0] = f;
+        this.f[1] = fline;
+
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
         this.symKey = new HashMap<>();
         this.fileMan = new OutputManager("Server","Server");
         this.fileMan.initFile();
         synchronize(); // Updates the reports in list to the latest in file
+
         this.server = retryConnection(7000);
         if (!imPrimary) {
             checkPrimaryServer(this.server);
@@ -172,8 +177,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
 
             this.symKey.put(user,originalKey);
-            System.out.println("lado do server: " + encodedKey);
-
 
             //this.setSymKey(originalKey);
         } catch (IOException e) {
@@ -591,7 +594,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
                 for(int i = 0; i < clientReports.size();i++){
-                    System.out.println(clientReports.get(i).getUsername());
                     if(!clientReports.get(i).getUsername().equals(userFinal)){
                         clientReports.remove(i);
                         i--;
@@ -904,7 +906,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
         File file = new File("ClientReports.txt");
         File fileu = new File("SystemUsers.txt");
-        File files = new File("SymKeys.txt");
+        File fileb = new File("Byzantines.txt");
 
         if (file.length() == 0){
             this.reps = new ArrayList<>();
@@ -974,6 +976,37 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     }
 
     //==========================VERIFY DATA=============================================================================
+
+    public void verifyF(int epoch){
+
+        HashMap<String,Integer> userReps = new HashMap<>();
+
+        for(String key : allSystemUsers.keySet()) {
+            userReps.put(key,0);
+        }
+
+        for(String key : allSystemUsers.keySet()) {
+            for(int i = 0; i < this.reps.size(); i++){
+                if(epoch == this.reps.get(i).getEpoch()){
+                    if(this.reps.get(i).getUsername().equals(key)){
+                        userReps.put(key,userReps.get(key)+1);
+                    }
+                }
+            }
+        }
+
+        for(String key : allSystemUsers.keySet()) {
+            System.out.println("********** "+key+":"+userReps.get(key));
+            if(userReps.get(key) > this.f[0]){ // f[0] = f is the highest cardinality for byzantines in system
+                this.fileMan.appendInformation("********** AT EPOCH "+epoch+" IT'S ABSOLUTELY GUARANTEED THAT "+key+" POSITION IS CORRECT **********");
+            }else if(userReps.get(key) > this.f[1]){ // f[1] = f' is the number of byzantines nearby other users
+                this.fileMan.appendInformation("********** AT EPOCH "+epoch+" "+key+" POSITION IS PROBABLY CORRECT **********");
+            }else{
+                this.fileMan.appendInformation("********** AT EPOCH "+epoch+" THERE'S NO GUARANTEE THAT "+key+" POSITION IS CORRECT **********");
+            }
+        }
+
+    }
 
     private String verifyLocationReport(ClientInterface c,String user, Report locationReport) {
         //witness signature
@@ -1083,7 +1116,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public static void main(String args[]) {
         try {
-            Server server = new Server(5);
+            Server server = new Server(4,2);
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         } catch (NotBoundException e) {
