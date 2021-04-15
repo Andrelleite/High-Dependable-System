@@ -22,6 +22,8 @@ class Simulation{
     private Server server;
     private List<Thread> workers;
     private List<String> clientsName;
+    private int fileNumber;
+
 
     public Simulation(Map<String,Integer> clientEpochs, List<Client> clients, int filenumber) throws IOException, NotBoundException, InterruptedException, ClassNotFoundException {
         this.byzantines = new ArrayList<>();
@@ -30,12 +32,13 @@ class Simulation{
         this.clientEpochs = clientEpochs;
         this.clients = clients;
         this.epoch = "0";
+        this.fileNumber = filenumber;
         simulate("simulate"+filenumber);
     }
 
     private void startServer() throws NotBoundException, IOException, ClassNotFoundException {
         try {
-            this.server = new Server(this.f);
+            this.server = new Server(this.f,this.fline);
         }  catch (NotBoundException | IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }
@@ -55,7 +58,7 @@ class Simulation{
             if(byz == 0){
                 try {
                     System.out.println("-------- NEW CLIENT "+username+" -------");
-                    Client client = new Client();
+                    Client client = new Client(this.fileNumber);
                     String url = "rmi://127.0.0.1:7001/" + username;
                     Naming.rebind(url, client);
                     client.setUsername(username);
@@ -105,7 +108,7 @@ class Simulation{
 
     private void setByzantines(String regex) throws RemoteException, MalformedURLException, NotBoundException {
         String username = regex.split(",")[0];
-        Byzantine bad = new Byzantine();
+        Byzantine bad = new Byzantine(this.fileNumber);
         System.out.println("------Setting Byzantine user: "+username+"------");
         bad.setUsername(username);
         String url = "rmi://127.0.0.1:7001/" + username;
@@ -241,6 +244,7 @@ class Simulation{
             if(!this.epoch.equals(request)){
                 this.epoch = request;
                 System.out.println("EPOCH MOVED TO "+this.epoch);
+                this.server.verifyF(Integer.parseInt(this.epoch)-1);
             }
             try {
                 sendProofReq();
@@ -346,9 +350,9 @@ class Simulation{
                 }
                 Thread.sleep(1000);
             }
-
             lineCounter++;
         }
+        this.server.verifyF(Integer.parseInt(this.epoch));
         for(int i = 0; i < this.workers.size(); i++){
             this.workers.get(i).join();
         }
@@ -421,18 +425,39 @@ public class Application {
 
         int epoch = 0;
         int lastEpoch = 0;
+        int numberOfUsers = 0;
         List<Client> clientsList = new ArrayList<>();
         List<String> clientsWithError = new ArrayList<>();
         Map<String, Integer> initClients = new HashMap<String, Integer>();
         LocateRegistry.createRegistry(7001);
         int filenumber;
+        int flag = 0;
+        int lineCounter = 0;
 
-        //gridGenerator(5,3,2,40);
-        
+
+        System.out.print("NUMBER OF SIMULATION: ");
+        Scanner scan = new Scanner(System.in);
+        filenumber = scan.nextInt();
+
+
+        File s = new File("src/grid/simulate"+filenumber+".txt");
+        Scanner reader = new Scanner(s);
+        while (reader.hasNextLine() && flag == 0) {
+            String line = reader.nextLine();
+            if(lineCounter == 1) {
+                numberOfUsers = Integer.parseInt(line.split(",")[1]);
+                flag = 1;
+            }
+            lineCounter++;
+        }
+        System.out.println("NUMBER OF USERS: "+numberOfUsers);
+        reader.close();
+        gridGenerator(numberOfUsers,filenumber,2,40);
+
         /* Load epochs and users*/
         try {
-            File myObj = new File("src/grid/grid1.txt");
-            Scanner reader = new Scanner(myObj);
+            File myObj = new File("src/grid/grid"+filenumber+".txt");
+            reader = new Scanner(myObj);
             while (reader.hasNextLine()) {
                 String data = reader.nextLine();
                 String username = data.split(",")[0];
@@ -450,9 +475,6 @@ public class Application {
             e.printStackTrace();
         }
 
-        System.out.print("NUMBER OF SIMULATION: ");
-        Scanner scan = new Scanner(System.in);
-        filenumber = scan.nextInt();
 
         Simulation simulation = new Simulation(initClients,clientsList,filenumber);
         System.exit(1);
