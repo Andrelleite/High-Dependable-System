@@ -1,1 +1,8 @@
 =================== user8 Output File ===================
+23:49:1 ->  [REQUEST TO SERVER]  PROOF OF LOCATION
+23:49:1 -> 		user8 trying to contact user1
+23:49:2 -> 		SERVER SIGNATURE:time: 23:49:02.004142 | signature: ZqM7foaQ8LUx+g8PZCRLcSrNBG/tnjLKcX3XVa3fYmrKKxE2omZ0SlJmc0HE7XC0oKE4I6HyK9dWOWwgLndzgue0tFgOjxaHPJ3YeTD6ZIIgZyMCOSARCWQG28VpWGhSu1K0FfLn8PnVy+lnBxLIyzrhSh6vktFf+FAIDGVAdMlKT0nhKNItGovFR71+Gjl66fWKz2aqiwMNxyyZnmsTql87Usr17VdVI6y89HfdBgTGj4pk2qWCfRiR3kVQOKAvnUVsSuloktI8hj3EEOTfQyO5iiJ84wTvLXzEpxhzqoqJ4V2pG3pabb6P2iX3DcNtWdgOv79CWdtugxBnYrtSxw==
+23:49:2 -> 		user8 trying to contact user3
+23:49:2 -> 		SERVER SIGNATURE:time: 23:49:02.331071 | signature: KcvBQC/axQ8J0bdxThoGp+LiuCWiVnQrRvpS5TFBetZZBN9icP3HN/FmLe3Dj/skMvI/CHCP1vAVK8UBS+/cjfs5ZHkDPycWMtqdtbPFbpZyS3BGtaVkxooZfW/iNiDXP+noZxs9+JBueFHxnTyKlt35Y0M961o7uQ4KICNdtJMWWTrl6k4wmCNYDfqSvmgLhtmrM+flA1XBiUYwWizZ2UrV2eLpCl304P126WOqwk+fCuK+vNyf1oINuHAJqO3lobZZo0jgXkPCicas4/3zbPlxfZxVL7HjRkGUobGDM+646oMWXjO6T/EAeZgtpRk7QSaR0WM5JW4i5C/bl5up4A==
+23:49:2 -> 		user8 trying to contact user7
+23:49:2 -> 		SERVER SIGNATURE:time: 23:49:02.656915 | signature: UXhvnDLupLDOCcT9My2RHHlnthFzeV89Y7t7PI1Cy/wkOYkveJ+ywAyiVaIfvmO6Q2M72mEzBTfR72KJYQLY7SxY3r0MpP2XCJpbcCJZ6yk61OIOVORRcbTxlvTAX6uRmk+9y++Ad07ImpBP0rx3F+5RFa7G9qmS1W5NH0WU0vlx8+GNmb2ny69G3wR8nlninS9tGPzMFGsXtFW+Q0gkhlIk5TQTIRxeVu5I8mXz1OGblC8X2y+sM71yipQmtqNzVvLVIjLFjxBo20rYXdTvfKIW7bqrs4EEhMGuxGNwhl52jS/EuMKiF8vO5bjEHU8GvaAo5W0UUqLBe8eKpy6ksg==

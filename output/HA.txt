@@ -1,1 +1,8 @@
 =================== Health Authority Output File ===================
+23:49:8 -> New try.
+23:49:9 -> New try.
+23:49:10 -> New try.
+23:49:11 -> New try.
+23:49:12 -> New try.
+23:49:13 ->  [REQUEST TO SERVER]  LOCATIONS OF USER: user5 at epoch 0 $$$
+23:49:14 ->  [REQUEST TO SERVER] USERS AT: 10,20 IN EPOCH 0 $$$

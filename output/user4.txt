@@ -1,1 +1,9 @@
 =================== user4 Output File ===================
+23:48:59 ->  [REQUEST TO SERVER]  PROOF OF LOCATION
+23:48:59 -> 		user4 trying to contact user2
+23:48:59 -> 		SERVER SIGNATURE:time: 23:48:59.525658 | signature: X0Yrg2Qw+olCT71XG31gqJSXoyYsHRPUQwrP/djAVsIgMwwIMksrxiTgJWsAn9YCXlx3JXMD9xFxlz2HeDaBa6ETo4oAyXm7L3QNmRf8kENGWaqYLN/PzEsueicQtKUPEWGg0uQPpkFhrTYbL54rXoUQV6vRRfs54dBuTiat2sjo2scuO3Q3DaTJvIE1+0/ImKT6HMHjpPe1WFxne4pcp+SbqLMthL/iO+wTL1vTB3r405tyQIMYba7oqPBTDkJJ+X8p6XZcPp6hw0sFBkvTT1pKDQ3Mn+BQq9vIBRIiMJEOidbmnDaA3eJbK8j6/PDuocPfSs5u73gG7hOr3qWu5A==
+23:48:59 -> 		user4 trying to contact user5
+23:48:59 -> 		SERVER SIGNATURE:time: 23:48:59.866478 | signature: WsV7xkR2xcRPkr84v8a99ORL2k6obZx+oEKfCldwqMSVLDqmrK53X/pLBTbNFrQZRttOv1NkeqnyPSng2x4Isgod5wPg8dg4qNmlKExd8DjfOoRdsd+V4VQzEz5GcvSnO3B76tlnppWzakqXPkOqmiql3temzGd3KlV38pPsb3E8j7lT/oX5CpR7j708CR5+/UTsZzi4ad+vuynPRftupI64EXPF8Xa7j7qefzahB1VWOY/nXcuxqDAX7bX7IYeF/KuW1a/Kq+blafaizXOr3oY9niZibgwn9lX6WVw2BXOibQcQHy+NFvljbD/gysnNceQuN4symx29HrkbpICOlw==
+23:49:4 -> 		TRYING TO FAKE IDENTITY FROM user4 TO user3
+23:49:4 ->  [REQUEST TO SERVER]  MY REPORTS
+23:49:4 ->  [REQUEST TO SERVER]  DENIED

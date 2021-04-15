@@ -254,6 +254,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         for (String client : clients){
             SecretKey key = LoadFromKeyStore("src/keys/aes-" + client +".keystore", client, "KeyStore");
             this.symKey.put(client, key);
+            System.out.println("KEEEEEYYYYY " + key);
         }
     }
 
