@@ -158,6 +158,7 @@ class Simulation{
     private void sendProofReqFake(String username, String target) throws IOException, InterruptedException, ClassNotFoundException {
         int flag = 0;
         String original;
+        System.out.println("=================================== I'M TRICK WOW YA ====================================");
         for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
             if(this.byzantines.get(i).getUsername().equals(username)){
                 original = this.byzantines.get(i).getUsername();
@@ -221,7 +222,7 @@ class Simulation{
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-        }else if(request.equals("fake")){
+        }else if(origin.equals("fake")){
             System.out.println(origin+" is requesting his reports.");
             try {
                 sendProofReqFake(generated[2],generated[3]);

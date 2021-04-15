@@ -607,6 +607,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
                         serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
                         this.fileMan.appendInformation("\t\tSERVER SIGNATURE:" + serverSignature);
+                        System.out.println("SERVER SIGNATURE:" + serverSignature);
                     } catch (ConnectException ev){
                         try {
                             serverSignature = retry(this.getClientInterface(),this.getUsername(),message);

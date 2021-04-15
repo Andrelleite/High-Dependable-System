@@ -240,6 +240,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             @Override
             public void run() {
                 try{
+
+                    filer.appendInformation("[PROOF REQUEST] "+user);
                     //get server private key
                     /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                     byte[] encoded1 = new byte[fis0.available()];
@@ -270,53 +272,67 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                     locationReport.setWitness(witness);
 
-                    Cipher cipherWit = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipherWit.init(Cipher.DECRYPT_MODE, symKey.get(witness));
+                    if(witness.equals(user)){
+                        serverReturn[0] = "null";
+                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! WITNESS EQUALS USER");
+                    }
 
-                    byte[] hashBytes2 = java.util.Base64.getDecoder().decode(locationReport.getWitnessPos());
-                    byte[] chunkWit = cipherWit.doFinal(hashBytes2);
-                    String info2 = new String(chunkWit, UTF_8);
 
-                    locationReport.setPosXWitness(Integer.parseInt(info2.split("w")[0].split("q")[1]));
-                    locationReport.setPosYWitness(Integer.parseInt(info2.split("w")[1].split("q")[1]));
+                    if(serverReturn[0] != "null"){
+                        Cipher cipherWit = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                        cipherWit.init(Cipher.DECRYPT_MODE, symKey.get(witness));
+
+                        byte[] hashBytes2 = java.util.Base64.getDecoder().decode(locationReport.getWitnessPos());
+                        byte[] chunkWit = cipherWit.doFinal(hashBytes2);
+                        String info2 = new String(chunkWit, UTF_8);
+
+                        locationReport.setPosXWitness(Integer.parseInt(info2.split("w")[0].split("q")[1]));
+                        locationReport.setPosYWitness(Integer.parseInt(info2.split("w")[1].split("q")[1]));
+                    }
 
                 }
                 catch (NoSuchAlgorithmException e) {
                     filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR1");
+                    serverReturn[0] = "null";
                 } catch (NoSuchPaddingException e) {
                     filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR2");
+                    serverReturn[0] = "null";
                 } catch (InvalidKeyException e) {
                     filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR3");
+                    serverReturn[0] = "null";
                 } catch (IllegalBlockSizeException e) {
                     filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR4");
+                    serverReturn[0] = "null";
                 } catch (BadPaddingException e) {
                     filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR5");
+                    serverReturn[0] = "null";
                 }
 
-                filer.appendInformation("[PROOF REQUEST] "+user+" SUBMITING NEW LOCATION PROOF AT EPOCH "+locationReport.getEpoch()+" ===== ");
+                if(serverReturn[0] != "null"){
+                    filer.appendInformation("[PROOF REQUEST] "+user+" SUBMITING NEW LOCATION PROOF AT EPOCH "+locationReport.getEpoch()+" ===== ");
 
-                String verifyRet = verifyLocationReport(c, user, locationReport);
-                if(verifyRet.equals("Correct") /*&& !checkClone(locationReport)*/){
-                    filer.appendInformation("\t\t\tRECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
-                    filer.appendInformation("\t\t\tUSER SIGNATURE: " + locationReport.getUserSignature());
-                    filer.appendInformation("\t\t\tTIMESTAMP: " + locationReport.getTimeStamp());
-                    filer.appendInformation("\t\t\tPOS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
-                    filer.appendInformation("\t\t\tWITNESS: " + locationReport.getWitness());
-                    filer.appendInformation("\t\t\tWITNESS SIGNATURE: " + locationReport.getWitnessSignature());
-                    filer.appendInformation("\t\t\tWITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
-                    filer.appendInformation("\t\t\tWITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
+                    String verifyRet = verifyLocationReport(c, user, locationReport);
+                    if(verifyRet.equals("Correct") /*&& !checkClone(locationReport)*/){
+                        filer.appendInformation("\t\t\tRECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
+                        filer.appendInformation("\t\t\tUSER SIGNATURE: " + locationReport.getUserSignature());
+                        filer.appendInformation("\t\t\tTIMESTAMP: " + locationReport.getTimeStamp());
+                        filer.appendInformation("\t\t\tPOS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
+                        filer.appendInformation("\t\t\tWITNESS: " + locationReport.getWitness());
+                        filer.appendInformation("\t\t\tWITNESS SIGNATURE: " + locationReport.getWitnessSignature());
+                        filer.appendInformation("\t\t\tWITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
+                        filer.appendInformation("\t\t\tWITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
 
-                    reps.add(locationReport);
-                    try {
+                        reps.add(locationReport);
+                        try {
 
-                        updateReports();
+                            updateReports();
 
-                        //Get time
-                        String time = java.time.LocalTime.now().toString();
+                            //Get time
+                            String time = java.time.LocalTime.now().toString();
 
-                        String s1 = user + time + locationReport.getEpoch();
+                            String s1 = user + time + locationReport.getEpoch();
 
-                        //get server private key
+                            //get server private key
                         /*
                         FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
                         byte[] encoded1 = new byte[fis0.available()];
@@ -328,37 +344,39 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                          */
 
-                        PrivateKey priv = loadPrivKey("server");
+                            PrivateKey priv = loadPrivKey("server");
 
-                        //Hash message
-                        byte[] messageByte0 = s1.getBytes();
-                        MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
-                        digest0.update(messageByte0);
-                        byte[] digestByte0 = digest0.digest();
-                        String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+                            //Hash message
+                            byte[] messageByte0 = s1.getBytes();
+                            MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                            digest0.update(messageByte0);
+                            byte[] digestByte0 = digest0.digest();
+                            String digest64 = Base64.getEncoder().encodeToString(digestByte0);
 
-                        //sign the hash with the server's private key
-                        Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                        cipherHash.init(Cipher.ENCRYPT_MODE, priv);
-                        byte[] hashBytes = Base64.getDecoder().decode(digest64);
-                        byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
-                        String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+                            //sign the hash with the server's private key
+                            Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                            cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+                            byte[] hashBytes = Base64.getDecoder().decode(digest64);
+                            byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+                            String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
-                        serverReturn[0] = "time: " + time + " | signature: " + signedHash;
-                        filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
-                        filer.appendInformation("\t\t SIGNATURE: " + signedHash);
+                            serverReturn[0] = "time: " + time + " | signature: " + signedHash;
+                            filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
+                            filer.appendInformation("\t\t SIGNATURE: " + signedHash);
 
 
-                    } catch (IOException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException e) {
-                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR6");
-                    } catch (BadPaddingException e) {
-                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR7");
-                    } catch (IllegalBlockSizeException e) {
-                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR8");
+                        } catch (IOException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException e) {
+                            filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR6");
+                        } catch (BadPaddingException e) {
+                            filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR7");
+                        } catch (IllegalBlockSizeException e) {
+                            filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR8");
+                        }
+                    }else{
+                        filer.appendInformation("\t\t\tREQUEST FOR LOCATION PROOF DENIED.");
                     }
-                }else{
-                    filer.appendInformation("\t\t\tREQUEST FOR LOCATION PROOF DENIED.");
                 }
+
                 if(serverReturn[0] == null)
                     serverReturn[0] = "null";
             }
@@ -428,7 +446,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 //Get time
                 String time = java.time.LocalTime.now().toString();
 
-                String s1 = username + time + epoch;
+                String s1 = username + time + ep[0];
 
                 String finalS = "";
 
