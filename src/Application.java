@@ -21,6 +21,7 @@ class Simulation{
     private List<Client> clients;
     private Server server;
     private List<Thread> workers;
+    private List<String> clientsName;
 
     public Simulation(Map<String,Integer> clientEpochs, List<Client> clients, int filenumber) throws IOException, NotBoundException, InterruptedException, ClassNotFoundException {
         this.byzantines = new ArrayList<>();
@@ -68,6 +69,31 @@ class Simulation{
                 }
             }
         }
+
+    }
+
+    private void setClientsName (){
+        List<String> clientsNames = new ArrayList<>();
+
+        Iterator<Client> itr = this.clients.iterator();
+        while (itr.hasNext()) {
+            Client client = itr.next();
+            if(!clientsNames.contains(client.getUsername())){
+                clientsNames.add(client.getUsername());
+            }
+        }
+
+        Iterator<Byzantine> itrb = this.byzantines.iterator();
+        while (itrb.hasNext()) {
+            Byzantine client = itrb.next();
+            if(!clientsNames.contains(client.getUsername())){
+                clientsNames.add(client.getUsername());
+            }
+        }
+
+        clientsNames.add("ha");
+
+        clientsName = clientsNames;
 
     }
 
@@ -256,6 +282,9 @@ class Simulation{
         }else if(request.equals("up")){
             System.out.println("Turn on Server.");
             startServer();
+            setClientsName();
+            server.setClients(clientsName);
+
         }else if(origin.equals("spy")){
             if(request.equals("report")){
                 spyOnReports(generated[2],generated[3],generated[4]);

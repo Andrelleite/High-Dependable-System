@@ -1,15 +1,1 @@
 =================== user9 Output File ===================
-19:25:11 ->  [REQUEST TO SERVER]  PROOF OF LOCATION
-19:25:11 -> 		user9 trying to contact user1
-19:25:11 -> 		SERVER SIGNATURE:time: 19:25:11.244120400 | signature: N/t5tPJ41AYPirCEOsEqHAgKaLykvZessXbb1o0zQ+Cs9JIj5sMQ/9mLWms+wJD2IIXoeupVXLhpaegaYMpS8O4e/lwI4sMXxDmLNw6hXdv5+DBrspYNVnXt3RHBU9YG8N9Z07/tNJ3t3SnnedtBVpJnuWbRtdgood6j9f6ucIQc8VWj+IcBhSBWa0n4EohwXoubuAFukgUZZf8sc3kVdM+LA2kjdK0Fpfhd0TO+XCItzdmVwCJ6lRNdPN3xJ7Ww+bv2VEDX6G6AcFFoC7U6rJdpZj+JHY9jJqbw8oIl5dodnxIXX5z1v71i9tzB+3PXiA/F4K3VTzUvCWcbuX4vqg==
-19:25:11 -> 		user9 trying to contact user3
-19:25:11 -> 		SERVER SIGNATURE:time: 19:25:11.504775100 | signature: YXtYi+y8eTqAu44NoAG2fBKKVfQj/hO4JegZ6fiAjuQIkSA8Y2936Cx7pcR81LZZlQRWF8bfvob7CD29gamh9N4WbqghOga2ZqMFiHlZCs/dhZ+SseVOfMieiphizcz19xduTO9h9t9/zXfsG++hKERXoVJdPxq2p9n+KYXkzhFgS/tlJX8xt05XEY9Abu35hCyXMEYvPuLDtHdlBFfo0rhihLsm4L5Ut4OVw+kaOWhodnvZxkkhxdGlHvUirzemtLvGMF4tZfegA2+a4qc98lidR4ASggdqThx+VwhImL5BJ9S7i6L0H0XonbDrUd/+cEcxRxDKAsxYj2i/lzabAQ==
-19:25:11 -> 		user9 trying to contact user6
-19:25:11 -> 		SERVER SIGNATURE:time: 19:25:11.769815400 | signature: CRdXahRw3sE9x5yt/j4u39AydyZBLyCUHXKp0y/4zZ9id+HgC/HVhAK31lNSwoohpPxF1+JrKneTXSVnXPAJWukyESenoF5oTtmMbJWVswRCyi4IdXIB7azKRplIOEgEvECsWpHtxmivABSXTViLyffRmg0RL7HNtSo/RgTKE+Rrk3A1h/BGtuTgV/pBbyhyYrlYLeXO4Sr5+qqh7DxTScWztn0tYMV2VDcEOUA6hQQHZhkeGmpcCcKgiqaype80JGhsYW0zIecm+8qdn/dUS4s3MZIyBQvXSNCWISOARdtCUVoymHGee2Kfk2npDerm1t2c+iQ1Ji9thMmG8dWrTg==
-19:25:23 ->  [REQUEST TO SERVER]  PROOF OF LOCATION
-19:25:23 -> 		user9 trying to contact user8
-19:25:23 -> 		SERVER SIGNATURE:time: 19:25:23.391890800 | signature: majg9c+46blY++CiAv4b3gy92RgQdOPXDLoaUYEY1M4TBfyvk9FjZGzeomH52RltIOfu9QnYayQ+15Ez4SyZuCgZnTOYEtEnE+KopTHb3ZtAMUvzVeZJxl9DvVom/udef/YscgZNiGaDmMIf+w9tqbhLedhY4nt33W8snSYjjBSkBZNp/1ebYjGBrCYviCwkeHZmF5oDnRBSx81PhzjGu2OxDVyhoS2XNIiZbmgPOU9c52j0N/grtxFcrUUfuI6kE7QZ1vXKCvVDWnOL2umktcSzdaA49JyMxcH9BCANdAqGTF7XvZQ3TmDhuDIgX9lxHb/IPM61Ev3cEzcPJ5y5+g==
-19:25:38 ->  [REQUEST TO SERVER]  PROOF OF LOCATION
-19:25:38 -> 		user9 trying to contact user7
-19:25:38 -> 		SERVER SIGNATURE:null
-19:25:38 -> 		SOMETHING WRONG HAPPENED, RETURN NOT SIGNED

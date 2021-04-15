@@ -7,6 +7,7 @@ import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.*;
 import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -14,10 +15,8 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
+
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class Server extends UnicastRemoteObject implements ServerInterface, Serializable{
@@ -29,6 +28,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private ArrayList<Report> reps; // Structure of all reports in the system
     private ServerInterface server;
     private OutputManager fileMan;
+    private List<String> clients;
     private boolean imPrimary;
     private String IPV4;
     private int portRMI;
@@ -44,10 +44,18 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         this.fileMan = new OutputManager("Server","Server");
         this.fileMan.initFile();
         synchronize(); // Updates the reports in list to the latest in file
+        if(clients != null){
+            loadSymmKeys(clients);
+            System.out.println(symKey);
+        }
         this.server = retryConnection(7000);
         if (!imPrimary) {
             checkPrimaryServer(this.server);
         }
+    }
+
+    public void setClients(List<String> clients) {
+        this.clients = clients;
     }
 
     private void checkPrimaryServer(ServerInterface serverPrimary) {
@@ -131,6 +139,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
 
             this.symKey.put("ha",originalKey);
+            StoreKeysToKeyStore(originalKey, "ha","KeyStore","src/keys/aes-ha.keystore");
+
 
         }  catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -141,6 +151,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         } catch (NoSuchPaddingException e) {
             e.printStackTrace();
         }  catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -174,6 +190,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             this.symKey.put(user,originalKey);
             System.out.println("lado do server: " + encodedKey);
 
+            StoreKeysToKeyStore(originalKey, user,"KeyStore","src/keys/aes-" + user +".keystore");
+
 
             //this.setSymKey(originalKey);
         } catch (IOException e) {
@@ -187,6 +205,10 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         } catch (IllegalBlockSizeException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (KeyStoreException e) {
             e.printStackTrace();
         }
     }
@@ -223,6 +245,41 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             return pk;
         } catch(Exception e){
             System.out.println(e);
+        }
+
+        return null;
+    }
+
+    public void loadSymmKeys(List<String> clients ) {
+        for (String client : clients){
+            SecretKey key = LoadFromKeyStore("src/keys/aes-" + client +".keystore", client, "KeyStore");
+            this.symKey.put(client, key);
+        }
+    }
+
+    public static void StoreKeysToKeyStore(SecretKey keyToStore, String userName, String password,String filepath) throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
+        KeyStore javaKeyStore = KeyStore.getInstance("PKCS12");
+        javaKeyStore.load(null, password.toCharArray());
+
+        System.out.println("GUARDEI O USER " + userName);
+        javaKeyStore.setKeyEntry(userName, keyToStore, password.toCharArray(), null);
+        OutputStream writeStream = new FileOutputStream(filepath);
+        javaKeyStore.store(writeStream, password.toCharArray());
+    }
+
+    public static SecretKey LoadFromKeyStore(String filepath, String userName, String password){
+        try {
+            InputStream keystoreStream = new FileInputStream(filepath);
+            KeyStore keystore = KeyStore.getInstance("PKCS12");
+            keystore.load(keystoreStream, password.toCharArray());
+            if (!keystore.containsAlias(userName)) {
+                throw new RuntimeException("Alias for key not found");
+            }
+            SecretKey key = (SecretKey) keystore.getKey(userName, password.toCharArray());
+
+            return key;
+        } catch(Exception e){
+            e.printStackTrace();
         }
 
         return null;

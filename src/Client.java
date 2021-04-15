@@ -232,7 +232,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     public void loadMoves() {
         try {
             //coordenadas falsas
-            File myObj = new File("src/grid/grid3.txt");
+            File myObj = new File("src/grid/grid1.txt");
             Scanner reader = new Scanner(myObj);
             while (reader.hasNextLine()) {
                 String data = reader.nextLine();
@@ -305,7 +305,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     public Report generateLocationReportWitness(ClientInterface c, String username, int userEpoch) throws RemoteException{
         try {
-            File myObj = new File("src/grid/grid3.txt");
+            File myObj = new File("src/grid/grid1.txt");
             Scanner reader = new Scanner(myObj);
             while (reader.hasNextLine()) {
                 String data = reader.nextLine();
@@ -395,7 +395,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     public ArrayList<String> findUser() {
         ArrayList<String> usersNearby = new ArrayList<>();
         try {
-            File myObj = new File("src/grid/grid3.txt");
+            File myObj = new File("src/grid/grid1.txt");
             Scanner reader = new Scanner(myObj);
             while (reader.hasNextLine()) {
                 String data = reader.nextLine();
