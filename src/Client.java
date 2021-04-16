@@ -818,7 +818,9 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
                 re.setPosX(Integer.parseInt(info.split("w")[0].split("q")[1]));
                 re.setPosY(Integer.parseInt(info.split("w")[1].split("q")[1]));
-                re.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
+                //re.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
+
+                re.setEpoch(Integer.parseInt(ep));
 
                 byte[] hashBytes3 = java.util.Base64.getDecoder().decode(re.getWitness());
                 byte[] chunk2 = rsaCipher.doFinal(hashBytes3);

@@ -277,7 +277,7 @@ class Simulation{
             epoch = regex.split(",")[4];
             if(origin.equals("ha")){
                 System.out.println("HA is requesting users history at this location: ("+x+","+y+") at epoch "+ epoch);
-                this.authorities.get(0).communicate(this.authorities.get(0).getServerInterface(),1,"",x,y,generated[2]);
+                this.authorities.get(0).communicate(this.authorities.get(0).getServerInterface(),1,"",x,y,epoch);
             }
         }else if(request.equals("down")){
             System.out.println("Simulate Server Crash or Connection drop.");

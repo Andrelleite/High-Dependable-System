@@ -210,11 +210,11 @@ public class HAClient extends Thread{
 
                     re.setWitness(witness);
 
-                    /*byte[] hashBytes4 = java.util.Base64.getDecoder().decode(re.getUsername());
+                    byte[] hashBytes4 = java.util.Base64.getDecoder().decode(re.getUsername());
                     byte[] chunk3 = rsaCipher.doFinal(hashBytes4);
                     String username =  new String(chunk3, UTF_8);
 
-                    re.setUsername(username);*/
+                    re.setUsername(username);
 
                     j++;
                     this.fileMan.appendInformation("\t\t ====== REPORT #"+j);

@@ -8,8 +8,9 @@ user8,b
 setupclients
 generateproofs,0
 fake,0,user4,user5
-user4,request,0
 user5,request,0
+user2,request,0
+user6,request,0
 spy,report,0,user4,user5
 generateproofs,1
 generateproofs,2

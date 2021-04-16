@@ -260,7 +260,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         for (String client : clients){
             SecretKey key = LoadFromKeyStore("src/keys/aes-" + client +".keystore", client, "KeyStore");
             this.symKey.put(client, key);
-            System.out.println("KEEEEEYYYYY " + key);
         }
     }
 
@@ -526,6 +525,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                                 Report r = (Report) i.next();
 
                                 String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+
                                 //r.setEpoch(-1);
                                 //r.setPosX(-1);
                                 //r.setPosY(-1);
