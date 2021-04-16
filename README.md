@@ -69,7 +69,7 @@ setupclients
 endsim
 ```
 
-Following the former example should set the basic instructions for run time, now we can choose which actions to perform in the simulation.
+Following the former example, it should set the basic instructions for run time (where the ellipsis are positioned), now we can choose which actions to perform in the simulation.
 These instructions are different for pratical reasons and we will define them for the following lines:
 1. **generateproof,[epoch]** : To generate the proofs of location for all the clients in the system. Epoch should be defined between 1 and the last epoch defined in the grid.txt;
 2. **fake,[epoch],user[x],user[y]** : To try to fake a proof, where user[x] will try to fake his identity as user[y];
