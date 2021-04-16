@@ -93,8 +93,15 @@ To easily run the application, first make sure you followed the next Steps:
 4. Select a number, indicating the simulation to run;
 5. Check the outputs at */outputs*;
 
-```
+Note that at runtime, an input will be requested regarding what simulation to follow.
+Please check out first the availability in store, and select a correct number.
+As this is set, the simulation will present the number of users, the total of byzantine users and those around another users.
 
+```
+NUMBER OF SIMULATION: **1** 
+NUMBER OF USERS: 5
+====================== SIMULATION HAS STARTED ======================
+F: 2 F': 1
 ```
 
 ## Expected Outputs
