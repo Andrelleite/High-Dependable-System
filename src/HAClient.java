@@ -111,7 +111,8 @@ public class HAClient extends Thread{
         try {
             if(op == 1){
                 /* All users location report at specific location and epoch *test* */
-                this.fileMan.appendInformation(" [REQUEST TO SERVER] USERS AT: "+x+","+y+" IN EPOCH "+epoch+" $$$");
+                this.fileMan.appendInformation("\n");
+                this.fileMan.appendInformation("[REQUEST TO SERVER] USERS AT: "+x+","+y+" IN EPOCH "+epoch+" $$$");
 
                 Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
@@ -169,7 +170,8 @@ public class HAClient extends Thread{
                 }
             }else if(op == 2){
                 /* Specific user report at specific epochs *test* */
-                this.fileMan.appendInformation(" [REQUEST TO SERVER]  LOCATIONS OF USER: "+user+" at epoch "+epoch+" $$$");
+                this.fileMan.appendInformation("\n");
+                this.fileMan.appendInformation("[REQUEST TO SERVER]  LOCATIONS OF USER: "+user+" at epoch "+epoch+" $$$");
 
                 Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
@@ -267,7 +269,7 @@ public class HAClient extends Thread{
         thread.start();
         thread.join();
         if(this.h == null){
-            this.fileMan.appendInformation("SERVICE IS DOWN. COME BACK LATER.");
+            this.fileMan.appendInformation("\nSERVICE IS DOWN. COME BACK LATER.");
             return;
         }else{
             communicate(this.h,op,user,x,y,epoch);

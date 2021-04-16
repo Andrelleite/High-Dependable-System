@@ -190,7 +190,8 @@ class Simulation{
         for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
             if(this.byzantines.get(i).getUsername().equals(username)){
                 original = this.byzantines.get(i).getUsername();
-                this.byzantines.get(i).getFileMan().appendInformation("\t\tTRYING TO FAKE IDENTITY FROM "+username+" TO "+target);
+                this.byzantines.get(i).getFileMan().appendInformation("\n");
+                this.byzantines.get(i).getFileMan().appendInformation(" TRYING TO FAKE IDENTITY FROM "+username+" TO "+target);
                 this.byzantines.get(i).setUsername(target,original);
                 this.byzantines.get(i).setRequestLocationProof();
                 this.byzantines.get(i).setUsername(original,original);
@@ -206,7 +207,8 @@ class Simulation{
         for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
             if(this.byzantines.get(i).getUsername().equals(byz)){
                 original = this.byzantines.get(i).getUsername();
-                this.byzantines.get(i).getFileMan().appendInformation("\t\tTRYING TO FAKE IDENTITY FROM "+byz+" TO "+victim);
+                this.byzantines.get(i).getFileMan().appendInformation("\n");
+                this.byzantines.get(i).getFileMan().appendInformation(" TRYING TO FAKE IDENTITY FROM "+byz+" TO "+victim);
                 this.byzantines.get(i).setUsername(victim,original);
                 this.byzantines.get(i).getReports(epoch);
                 this.byzantines.get(i).setUsername(original,original);
@@ -433,6 +435,14 @@ public class Application {
         int filenumber;
         int flag = 0;
         int lineCounter = 0;
+
+        PrintWriter writer = new PrintWriter("ClientReports.txt");
+        writer.print("");
+        writer.close();
+
+        writer = new PrintWriter("SystemUsers.txt");
+        writer.print("");
+        writer.close();
 
 
         System.out.print("NUMBER OF SIMULATION: ");

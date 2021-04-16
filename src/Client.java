@@ -500,6 +500,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         ArrayList<String> usersToContact = findUser();
         Report message = null;
         String serverSignature = "";
+        this.fileMan.appendInformation("\n");
         this.fileMan.appendInformation(" [REQUEST TO SERVER]  PROOF OF LOCATION");
         if(usersToContact.size() != 0){
             Iterator i = usersToContact.iterator();
@@ -752,6 +753,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             ServerReturn r = s.obtainLocationReport(this.getClientInterface(),loc3,this.getUsername());
 
             if(r.getReports() == null || r.getServerProof() == null){
+                this.fileMan.appendInformation("\n");
                 this.fileMan.appendInformation(" [REQUEST TO SERVER]  MY REPORTS");
                 this.fileMan.appendInformation(" [REQUEST TO SERVER]  DENIED");
                 return;
@@ -803,7 +805,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             }else {
                 System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA (GET REPORTS)");
             }
-
+            this.fileMan.appendInformation("\n");
             this.fileMan.appendInformation(" [REQUEST TO SERVER]  MY REPORTS");
             int j = 0;
             Iterator i = r.getReports().iterator();

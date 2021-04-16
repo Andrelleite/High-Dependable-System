@@ -302,7 +302,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             @Override
             public void run() {
                 try{
-
+                    filer.appendInformation("\n");
                     filer.appendInformation("[PROOF REQUEST] "+user);
                     //get server private key
                     /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
@@ -462,6 +462,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             @Override
             public void run() {
                 int flag = 0;
+                filer.appendInformation("\n");
                 filer.appendInformation("[REPORT REQUEST] NEW REPORT DELIVERY REQUEST =====");
                 try{
 
@@ -650,7 +651,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     e.printStackTrace();
                 }
 
-
+                filer.appendInformation("\n");
                 filer.appendInformation("[HA USER REQUEST] HA REQUESTING "+userFinal+" LOCATION REPORTS AT EPOCH "+epochFinal+" ===== ");
 
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
@@ -801,6 +802,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     e.printStackTrace();
                 }
 
+                filer.appendInformation("\n");
                 filer.appendInformation("[HA LOCATION REQUEST] HA REQUESTING LOCATION REPORTS FOR POSITION ("+ positionDec[0] +","+ positionDec[1] +") AT EPOCH "+ep[0]+" =====");
 
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
