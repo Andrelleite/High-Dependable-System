@@ -69,7 +69,7 @@ setupclients
 endsim
 ```
 
-Following the former example should set the basic instructions for run time, now we can choose which actions to perform in the simulation.
+Following the former example, it should set the basic instructions for run time (where the ellipsis are positioned), now we can choose which actions to perform in the simulation.
 These instructions are different for pratical reasons and we will define them for the following lines:
 1. **generateproof,[epoch]** : To generate the proofs of location for all the clients in the system. Epoch should be defined between 1 and the last epoch defined in the grid.txt;
 2. **fake,[epoch],user[x],user[y]** : To try to fake a proof, where user[x] will try to fake his identity as user[y];
@@ -85,11 +85,11 @@ These instructions are different for pratical reasons and we will define them fo
   For the purpose of organized information and readable content, they are created at the start of each of this instances and are not final. It's expected the changes to persist until the next application run.
   They are located at this directory:
   
-  -> **C:\...\High-Dependable-System\output\ ...**
+  -> **C:/.../High-Dependable-System/output/ ...**
 
 ## Running Files
 
-To easily run the application, first make sure you followed the next Steps:
+To easily run the application, first make sure you follow the next steps:
 
 1. Setup file **simulate.txt** or select on from the existent;
 2. Run **Application.java**
