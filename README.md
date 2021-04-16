@@ -97,8 +97,9 @@ Note that at runtime, an input will be requested regarding what simulation to fo
 Please check out first the availability in store, and select a correct number.
 As this is set, the simulation will present the number of users, the total of byzantine users and those around another users.
 
+This example performs **Simulation1.txt**, as input = **1**:
 ```
-NUMBER OF SIMULATION: **1** 
+NUMBER OF SIMULATION: 1 
 NUMBER OF USERS: 5
 ====================== SIMULATION HAS STARTED ======================
 F: 2 F': 1
