@@ -85,11 +85,11 @@ These instructions are different for pratical reasons and we will define them fo
   For the purpose of organized information and readable content, they are created at the start of each of this instances and are not final. It's expected the changes to persist until the next application run.
   They are located at this directory:
   
-  -> **C:\...\High-Dependable-System\output\ ...**
+  -> **C:/.../High-Dependable-System/output/ ...**
 
 ## Running Files
 
-To easily run the application, first make sure you followed the next Steps:
+To easily run the application, first make sure you follow the next steps:
 
 1. Setup file **simulate.txt** or select on from the existent;
 2. Run **Application.java**
