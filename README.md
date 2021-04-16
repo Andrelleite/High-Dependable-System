@@ -1,5 +1,9 @@
 # High-Dependable-System
 
+## Test Files
+
+   To find the test files and scripts go to **/High-Dependable-System-main/src/grid**.
+
 ## Test files Setup
 
 Firstly there is defined the file **grid.txt**, where all moves are depicted. This files sets the first epoch and last, as well as the locations for each client at each of these epochs.
@@ -104,6 +108,8 @@ NUMBER OF USERS: 5
 ====================== SIMULATION HAS STARTED ======================
 F: 2 F': 1
 ```
+
+***NOTE: DO NOT FIDDLE WITH ClientReports.txt and SystemUsers***
 
 ## Expected Outputs
 
