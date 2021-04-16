@@ -2,7 +2,7 @@
 
 ## Test Files
 
-   To find the test files and scripts go to **/High-Dependable-System-main/src/grid**.
+   To find the test files and scripts go to **/High-Dependable-System-main/src/grid**
 
 ## Test files Setup
 
