@@ -89,11 +89,12 @@ These instructions are different for pratical reasons and we will define them fo
 
 ## Running Files
 
-To easily run the application, first make sure you follow the next steps:
+To compile and run the project we used IntelliJ, a Java IDE, with JDK 15, we suggest the use of this setup to facilitate running the project. 
+To easily run the application, first make sure you follow the next steps on the IDE:
 
 1. Setup file **simulate.txt** or select on from the existent;
-2. Run **Application.java**
-3. Select a number, indicating the simulation to run;
+2. Run **Application.java** on IntelliJ
+3. Select a number, indicating the simulation to run on the IDE console;
 4. Check the outputs at */outputs*;
 
 Note that at runtime, an input will be requested regarding which simulation to follow.
