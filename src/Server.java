@@ -16,6 +16,7 @@ import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -23,8 +24,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
-    public  HashMap<String,SecretKey> symKey;
-    private HashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
+    public  ConcurrentHashMap<String,SecretKey> symKey;
+    private ConcurrentHashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
     private ArrayList<Report> reps; // Structure of all reports in the system
     private ServerInterface server;
     private OutputManager fileMan;
@@ -44,7 +45,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
-        this.symKey = new HashMap<>();
+        this.symKey = new ConcurrentHashMap<>();
         this.fileMan = new OutputManager("Server","Server");
         this.fileMan.initFile();
         synchronize(); // Updates the reports in list to the latest in file
@@ -173,14 +174,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         try {
             updateUsers();
 
-            /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
-            byte[] encoded1 = new byte[fis0.available()];
-            fis0.read(encoded1);
-            fis0.close();
-            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
-            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);*/
-
             PrivateKey priv = loadPrivKey("server");
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -291,11 +284,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return null;
     }
 
-    public String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException, InterruptedException {
+    public synchronized String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException, InterruptedException {
 
         String[] serverReturn = new String[1];
         ArrayList<Report> reps = this.reps;
-        HashMap<String,SecretKey> symKey = this.symKey;
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
 
         Thread worker = new Thread("Worker") {
@@ -304,17 +297,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 try{
                     filer.appendInformation("\n");
                     filer.appendInformation("[PROOF REQUEST] "+user);
-                    //get server private key
-                    /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
-                    byte[] encoded1 = new byte[fis0.available()];
-                    fis0.read(encoded1);
-                    fis0.close();
-                    PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
-                    KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
-
-                    Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    rsaCipher.init(Cipher.DECRYPT_MODE, priv);*/
 
                     Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
                     cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
@@ -374,7 +356,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     filer.appendInformation("[PROOF REQUEST] "+user+" SUBMITING NEW LOCATION PROOF AT EPOCH "+locationReport.getEpoch()+" ===== ");
 
                     String verifyRet = verifyLocationReport(c, user, locationReport);
-                    if(verifyRet.equals("Correct") /*&& !checkClone(locationReport)*/){
+                    if(verifyRet.equals("Correct") && !checkClone(locationReport)){
                         filer.appendInformation("\t\t\tRECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
                         filer.appendInformation("\t\t\tUSER SIGNATURE: " + locationReport.getUserSignature());
                         filer.appendInformation("\t\t\tTIMESTAMP: " + locationReport.getTimeStamp());
@@ -450,12 +432,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn[0];
     }
 
-    public ServerReturn obtainLocationReport(ClientInterface c, String epoch, String username) throws IOException, ClassNotFoundException, InterruptedException {
+    public synchronized ServerReturn obtainLocationReport(ClientInterface c, String epoch, String username) throws IOException, ClassNotFoundException, InterruptedException {
 
         int[] ep = {-1};
         ServerReturn[] serverReturn = new ServerReturn[1];
         ArrayList<Report> reps = this.reps;
-        HashMap<String,SecretKey> symKey = this.symKey;
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
 
         Thread worker = new Thread("Worker") {
@@ -616,12 +598,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================AUTHORITY-METHODS==========================================================================
 
-    public ServerReturn obtainLocationReport(String user, String epoch) throws InterruptedException {
+    public synchronized  ServerReturn obtainLocationReport(String user, String epoch) throws InterruptedException {
 
         int[] ep = {-1};
         ServerReturn[] serverReturn = new ServerReturn[1];
         ArrayList<Report> reps = (ArrayList<Report>) this.reps.clone();
-        HashMap<String,SecretKey> symKey = this.symKey;
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
 
         Thread worker = new Thread("Worker"){
@@ -763,12 +745,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn[0];
     }
 
-    public ServerReturn obtainUsersAtLocation(String pos, String epoch) throws InterruptedException{
+    public synchronized  ServerReturn obtainUsersAtLocation(String pos, String epoch) throws InterruptedException{
 
         int[] ep = {-1};
         int[] posi = {-1, -1};
         ServerReturn[] serverReturn = new ServerReturn[1];
-        ArrayList<Report> reps = (ArrayList<Report>) this.reps.clone();HashMap<String,SecretKey> symKey = this.symKey;
+        ArrayList<Report> reps = (ArrayList<Report>) this.reps.clone();
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         String[] positionDec = new String[2];
         OutputManager filer = this.fileMan;
 
@@ -985,13 +968,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
 
         if (fileu.length() == 0){
-            this.allSystemUsers = new HashMap<>();
+            this.allSystemUsers = new ConcurrentHashMap<>();
             System.out.println("Array is empty. Next update will make it usable.");
         }
         else{
             ObjectInputStream ois = new ObjectInputStream(
                     new FileInputStream(fileu));
-            this.allSystemUsers = (HashMap<String, Double>) ois.readObject();
+            this.allSystemUsers = (ConcurrentHashMap<String, Double>) ois.readObject();
             System.out.println("LOAD SUCCESSFUL");
             System.out.println("SIZE OF LOAD "+this.allSystemUsers.size());
             ois.close();
