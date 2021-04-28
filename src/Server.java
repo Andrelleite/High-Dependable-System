@@ -950,38 +950,122 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private void synchronize() throws IOException, ClassNotFoundException {
 
+        ObjectInputStream ois, oist;
+        ArrayList<Report> tempRepsU, repsU;
+        ConcurrentHashMap<String,Double> tempU, u;
+        File tFile = new File("TempClientReports.txt");
         File file = new File("ClientReports.txt");
         File fileu = new File("SystemUsers.txt");
-        File fileb = new File("Byzantines.txt");
+        File tFileu = new File("TempSystemUsers.txt");
 
-        if (file.length() == 0){
-            this.reps = new ArrayList<>();
-            System.out.println("Array is empty. Next update will make it usable.");
-        }
-        else{
-            ObjectInputStream ois = new ObjectInputStream(
-                    new FileInputStream(file));
-            this.reps = (ArrayList<Report>) ois.readObject();
-            System.out.println("LOAD SUCCESSFUL");
-            System.out.println("SIZE OF LOAD "+this.reps.size());
-            ois.close();
+        if(!tFile.exists()){
+            if (file.length() == 0){
+                this.reps = new ArrayList<>();
+                System.out.println("Array is empty. Next update will make it usable.");
+            }
+            else{
+                ois = new ObjectInputStream(new FileInputStream(file));
+                this.reps = (ArrayList<Report>) ois.readObject();
+                System.out.println("LOAD SUCCESSFUL");
+                System.out.println("SIZE OF LOAD "+this.reps.size());
+                ois.close();
+            }
+        }else{
+            if(file.exists()){
+                try{
+                    ois = new ObjectInputStream(new FileInputStream(file));
+                    oist = new ObjectInputStream(new FileInputStream(tFile));
+                    tempRepsU = (ArrayList<Report>) oist.readObject();
+                    repsU = (ArrayList<Report>) ois.readObject();
+                    if(tempRepsU.size() <= repsU.size()){
+                        tFile.delete();
+                        this.reps = repsU;
+                    }else{
+                        boolean success = tFile.renameTo(file);
+                        this.reps = tempRepsU;
+                    }
+                    ois.close();
+                    oist.close();
+                }catch (IOException e){
+                    System.out.println("ENTER");
+                    oist = new ObjectInputStream(new FileInputStream(tFile));
+                    this.reps = (ArrayList<Report>) oist.readObject();
+                    System.out.println("+"+this.reps.size());
+                    oist.close();
+                    ObjectOutputStream oos= new ObjectOutputStream(
+                            new FileOutputStream(file));
+                    oos.writeObject(this.reps);
+                    boolean del = tFile.delete();
+                    System.out.println("Delete:"+del);
+                    oos.close();
+                }
+            }else{
+                oist = new ObjectInputStream(new FileInputStream(tFile));
+                this.reps = (ArrayList<Report>) oist.readObject();
+                oist.close();
+                ObjectOutputStream oos= new ObjectOutputStream(
+                        new FileOutputStream(file));
+                oos.writeObject(this.reps);
+                tFile.delete();
+                oos.close();
+            }
         }
 
-        if (fileu.length() == 0){
-            this.allSystemUsers = new ConcurrentHashMap<>();
-            System.out.println("Array is empty. Next update will make it usable.");
-        }
-        else{
-            ObjectInputStream ois = new ObjectInputStream(
-                    new FileInputStream(fileu));
-            this.allSystemUsers = (ConcurrentHashMap<String, Double>) ois.readObject();
-            System.out.println("LOAD SUCCESSFUL");
-            System.out.println("SIZE OF LOAD "+this.allSystemUsers.size());
-            ois.close();
+        if(!tFileu.exists()){
+            if (fileu.length() == 0){
+                this.allSystemUsers = new ConcurrentHashMap<>();
+                System.out.println("Array is empty. Next update will make it usable.");
+            }
+            else{
+                ois = new ObjectInputStream(new FileInputStream(fileu));
+                this.allSystemUsers = (ConcurrentHashMap<String,Double>) ois.readObject();
+                System.out.println("LOAD SUCCESSFUL");
+                System.out.println("SIZE OF LOAD "+this.allSystemUsers.size());
+                ois.close();
+            }
+        }else{
+            if(fileu.exists()){
+                try{
+                    ois = new ObjectInputStream(new FileInputStream(fileu));
+                    oist = new ObjectInputStream(new FileInputStream(tFileu));
+                    tempU = (ConcurrentHashMap<String,Double>) oist.readObject();
+                    u = (ConcurrentHashMap<String,Double>) ois.readObject();
+                    if(tempU.size() <= u.size()){
+                        tFileu.delete();
+                        this.allSystemUsers = u;
+                    }else{
+                        boolean success = tFileu.renameTo(fileu);
+                        this.allSystemUsers = tempU;
+                    }
+                    ois.close();
+                    oist.close();
+                }catch (IOException e){
+                    oist = new ObjectInputStream(new FileInputStream(tFileu));
+                    this.allSystemUsers = (ConcurrentHashMap<String,Double>) oist.readObject();
+                    System.out.println("+"+this.allSystemUsers.size());
+                    oist.close();
+                    ObjectOutputStream oos= new ObjectOutputStream(
+                            new FileOutputStream(fileu));
+                    oos.writeObject(this.allSystemUsers);
+                    boolean del = tFileu.delete();
+                    System.out.println("Delete:"+del);
+                    oos.close();
+                }
+            }else{
+                oist = new ObjectInputStream(new FileInputStream(tFileu));
+                this.allSystemUsers = (ConcurrentHashMap<String,Double>) oist.readObject();
+                oist.close();
+                ObjectOutputStream oos= new ObjectOutputStream(
+                        new FileOutputStream(fileu));
+                oos.writeObject(this.allSystemUsers);
+                tFileu.delete();
+                oos.close();
+
+            }
+
         }
 
     }
-
     private void updateReports() throws IOException {
 
         File file=new File("ClientReports.txt");
