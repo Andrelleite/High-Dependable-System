@@ -7,51 +7,60 @@ import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.*;
 import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public class Server extends UnicastRemoteObject implements ServerInterface, Serializable{
 
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
-    public  HashMap<String,SecretKey> symKey;
-    private HashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
+    public  ConcurrentHashMap<String,SecretKey> symKey;
+    private ConcurrentHashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
     private ArrayList<Report> reps; // Structure of all reports in the system
     private ServerInterface server;
     private OutputManager fileMan;
+    private List<String> clients;
     private boolean imPrimary;
     private String IPV4;
     private int portRMI;
     private int[] f;
+    private long id;
 
     //=======================CONNECTION=================================================================================
 
-    public Server(int f, int fline) throws IOException, NotBoundException, ClassNotFoundException {
+    public Server(int f, int fline, long id) throws IOException, NotBoundException, ClassNotFoundException {
 
         this.f = new int[2];
         this.f[0] = f;
         this.f[1] = fline;
-
+        this.id = id;
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
-        this.symKey = new HashMap<>();
-        this.fileMan = new OutputManager("Server","Server");
+        this.symKey = new ConcurrentHashMap<>();
+        this.fileMan = new OutputManager("Server"+this.id,"Server"+this.id);
         this.fileMan.initFile();
         synchronize(); // Updates the reports in list to the latest in file
-
         this.server = retryConnection(7000);
+
         if (!imPrimary) {
             checkPrimaryServer(this.server);
+        }
+    }
+
+    public void setClients(List<String> clients) {
+        this.clients = clients;
+    }
+
+    public void loadSymmetricKeys() {
+        if(clients != null){
+            loadSymmKeys(clients);
         }
     }
 
@@ -63,7 +72,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             state = false;
             try {
                 LocateRegistry.createRegistry(this.portRMI);
-                Naming.rebind("rmi://"+this.IPV4+":" + this.portRMI + "/SERVER", server);
+                Naming.rebind("rmi://"+this.IPV4+":" + this.portRMI + "/SERVER"+this.id, server);
                 imPrimary = true;
                 state = true;
             } catch (MalformedURLException | RemoteException ex) {
@@ -77,18 +86,18 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
         ServerInterface serverInt = null;
         Server server = this;
-        System.out.println("SERVER IS ONLINE AT "+this.IPV4);
+        System.out.println("SERVER "+this.id+" IS ONLINE AT "+this.IPV4);
 
         try {
             LocateRegistry.createRegistry(port);
-            Naming.rebind("rmi://"+this.IPV4+":" + port + "/SERVER", server);
+            Naming.rebind("rmi://"+this.IPV4+":" + port + "/SERVER"+this.id, server);
             imPrimary = true;
             System.out.println("I'm the primary");
         } catch (ExportException ex) {
             imPrimary = false;
             System.out.println("I'm the backup");
             try {
-                serverInt = (ServerInterface) Naming.lookup("rmi://"+this.IPV4+":" + port + "/SERVER");
+                serverInt = (ServerInterface) Naming.lookup("rmi://"+this.IPV4+":" + port + "/SERVER"+this.id);
                 System.out.println("Connetion to primary succeded...");
             } catch (NotBoundException e) {
                 try {
@@ -96,7 +105,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 }catch (ExportException s){
                     LocateRegistry.getRegistry(port);
                 }
-                Naming.rebind("rmi://"+this.IPV4+":" + port + "/SERVER", server);
+                Naming.rebind("rmi://"+this.IPV4+":" + port + "/SERVER"+this.id, server);
                 imPrimary = true;
                 System.out.println("I'm the primary");
             }
@@ -106,7 +115,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     }
 
     public int shutdown() throws MalformedURLException, NotBoundException, RemoteException {
-        Naming.unbind("rmi://"+this.IPV4+":" + portRMI + "/SERVER");
+        Naming.unbind("rmi://"+this.IPV4+":" + portRMI + "/SERVER"+this.id);
         return 1;
     }
 
@@ -134,8 +143,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
 
             String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
-
             this.symKey.put("ha",originalKey);
+            StoreKeysToKeyStore(originalKey, "ha","KeyStore","src/keys/aes-ha.keystore");
+
 
         }  catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
@@ -147,6 +157,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             e.printStackTrace();
         }  catch (IllegalBlockSizeException e) {
             e.printStackTrace();
+        } catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (KeyStoreException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -155,14 +171,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         this.allSystemUsers.put(user,0.0);
         try {
             updateUsers();
-
-            /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
-            byte[] encoded1 = new byte[fis0.available()];
-            fis0.read(encoded1);
-            fis0.close();
-            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
-            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);*/
 
             PrivateKey priv = loadPrivKey("server");
 
@@ -178,6 +186,10 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
             this.symKey.put(user,originalKey);
 
+            StoreKeysToKeyStore(originalKey, user,"KeyStore","src/keys/aes-" + user +".keystore");
+
+
+
             //this.setSymKey(originalKey);
         } catch (IOException e) {
             e.printStackTrace();
@@ -190,6 +202,10 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         } catch (IllegalBlockSizeException e) {
             e.printStackTrace();
         } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (CertificateException e) {
+            e.printStackTrace();
+        } catch (KeyStoreException e) {
             e.printStackTrace();
         }
     }
@@ -231,30 +247,54 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return null;
     }
 
-    public String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException, InterruptedException {
+    public void loadSymmKeys(List<String> clients ) {
+        for (String client : clients){
+            SecretKey key = LoadFromKeyStore("src/keys/aes-" + client +".keystore", client, "KeyStore");
+            this.symKey.put(client, key);
+        }
+    }
+
+    public static void StoreKeysToKeyStore(SecretKey keyToStore, String userName, String password,String filepath) throws KeyStoreException, CertificateException, NoSuchAlgorithmException, IOException {
+        KeyStore javaKeyStore = KeyStore.getInstance("PKCS12");
+        javaKeyStore.load(null, password.toCharArray());
+
+        System.out.println("GUARDEI O USER " + userName);
+        javaKeyStore.setKeyEntry(userName, keyToStore, password.toCharArray(), null);
+        OutputStream writeStream = new FileOutputStream(filepath);
+        javaKeyStore.store(writeStream, password.toCharArray());
+    }
+
+    public static SecretKey LoadFromKeyStore(String filepath, String userName, String password){
+        try {
+            InputStream keystoreStream = new FileInputStream(filepath);
+            KeyStore keystore = KeyStore.getInstance("PKCS12");
+            keystore.load(keystoreStream, password.toCharArray());
+            if (!keystore.containsAlias(userName)) {
+                throw new RuntimeException("Alias for key not found");
+            }
+            SecretKey key = (SecretKey) keystore.getKey(userName, password.toCharArray());
+
+            return key;
+        } catch(Exception e){
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public synchronized String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException, InterruptedException {
 
         String[] serverReturn = new String[1];
         ArrayList<Report> reps = this.reps;
-        HashMap<String,SecretKey> symKey = this.symKey;
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
 
         Thread worker = new Thread("Worker") {
             @Override
             public void run() {
                 try{
-
+                    filer.appendInformation("\n");
                     filer.appendInformation("[PROOF REQUEST] "+user);
-                    //get server private key
-                    /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
-                    byte[] encoded1 = new byte[fis0.available()];
-                    fis0.read(encoded1);
-                    fis0.close();
-                    PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
-                    KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
-
-                    Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    rsaCipher.init(Cipher.DECRYPT_MODE, priv);*/
 
                     Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
                     cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
@@ -314,7 +354,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     filer.appendInformation("[PROOF REQUEST] "+user+" SUBMITING NEW LOCATION PROOF AT EPOCH "+locationReport.getEpoch()+" ===== ");
 
                     String verifyRet = verifyLocationReport(c, user, locationReport);
-                    if(verifyRet.equals("Correct") /*&& !checkClone(locationReport)*/){
+                    if(verifyRet.equals("Correct") && !checkClone(locationReport)){
                         filer.appendInformation("\t\t\tRECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
                         filer.appendInformation("\t\t\tUSER SIGNATURE: " + locationReport.getUserSignature());
                         filer.appendInformation("\t\t\tTIMESTAMP: " + locationReport.getTimeStamp());
@@ -390,18 +430,19 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn[0];
     }
 
-    public ServerReturn obtainLocationReport(ClientInterface c, String epoch, String username) throws IOException, ClassNotFoundException, InterruptedException {
+    public synchronized ServerReturn obtainLocationReport(ClientInterface c, String epoch, String username) throws IOException, ClassNotFoundException, InterruptedException {
 
         int[] ep = {-1};
         ServerReturn[] serverReturn = new ServerReturn[1];
         ArrayList<Report> reps = this.reps;
-        HashMap<String,SecretKey> symKey = this.symKey;
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
 
         Thread worker = new Thread("Worker") {
             @Override
             public void run() {
                 int flag = 0;
+                filer.appendInformation("\n");
                 filer.appendInformation("[REPORT REQUEST] NEW REPORT DELIVERY REQUEST =====");
                 try{
 
@@ -465,6 +506,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                                 Report r = (Report) i.next();
 
                                 String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+
                                 //r.setEpoch(-1);
                                 //r.setPosX(-1);
                                 //r.setPosY(-1);
@@ -554,12 +596,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================AUTHORITY-METHODS==========================================================================
 
-    public ServerReturn obtainLocationReport(String user, String epoch) throws InterruptedException {
+    public synchronized  ServerReturn obtainLocationReport(String user, String epoch) throws InterruptedException {
 
         int[] ep = {-1};
         ServerReturn[] serverReturn = new ServerReturn[1];
         ArrayList<Report> reps = (ArrayList<Report>) this.reps.clone();
-        HashMap<String,SecretKey> symKey = this.symKey;
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
 
         Thread worker = new Thread("Worker"){
@@ -589,7 +631,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     e.printStackTrace();
                 }
 
-
+                filer.appendInformation("\n");
                 filer.appendInformation("[HA USER REQUEST] HA REQUESTING "+userFinal+" LOCATION REPORTS AT EPOCH "+epochFinal+" ===== ");
 
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
@@ -701,12 +743,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn[0];
     }
 
-    public ServerReturn obtainUsersAtLocation(String pos, String epoch) throws InterruptedException{
+    public synchronized  ServerReturn obtainUsersAtLocation(String pos, String epoch) throws InterruptedException{
 
         int[] ep = {-1};
         int[] posi = {-1, -1};
         ServerReturn[] serverReturn = new ServerReturn[1];
-        ArrayList<Report> reps = (ArrayList<Report>) this.reps.clone();HashMap<String,SecretKey> symKey = this.symKey;
+        ArrayList<Report> reps = (ArrayList<Report>) this.reps.clone();
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         String[] positionDec = new String[2];
         OutputManager filer = this.fileMan;
 
@@ -740,6 +783,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     e.printStackTrace();
                 }
 
+                filer.appendInformation("\n");
                 filer.appendInformation("[HA LOCATION REQUEST] HA REQUESTING LOCATION REPORTS FOR POSITION ("+ positionDec[0] +","+ positionDec[1] +") AT EPOCH "+ep[0]+" =====");
 
                 ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
@@ -904,58 +948,158 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private void synchronize() throws IOException, ClassNotFoundException {
 
+        ObjectInputStream ois, oist;
+        ArrayList<Report> tempRepsU, repsU;
+        ConcurrentHashMap<String,Double> tempU, u;
+        File tFile = new File("TempClientReports.txt");
         File file = new File("ClientReports.txt");
         File fileu = new File("SystemUsers.txt");
-        File fileb = new File("Byzantines.txt");
+        File tFileu = new File("TempSystemUsers.txt");
 
-        if (file.length() == 0){
-            this.reps = new ArrayList<>();
-            System.out.println("Array is empty. Next update will make it usable.");
-        }
-        else{
-            ObjectInputStream ois = new ObjectInputStream(
-                    new FileInputStream(file));
-            this.reps = (ArrayList<Report>) ois.readObject();
-            System.out.println("LOAD SUCCESSFUL");
-            System.out.println("SIZE OF LOAD "+this.reps.size());
-            ois.close();
+        if(!tFile.exists()){
+            if (file.length() == 0){
+                this.reps = new ArrayList<>();
+                System.out.println("Array is empty. Next update will make it usable.");
+            }
+            else{
+                ois = new ObjectInputStream(new FileInputStream(file));
+                this.reps = (ArrayList<Report>) ois.readObject();
+                System.out.println("LOAD SUCCESSFUL");
+                System.out.println("SIZE OF LOAD "+this.reps.size());
+                ois.close();
+            }
+        }else{
+            if(file.exists()){
+                try{
+                    ois = new ObjectInputStream(new FileInputStream(file));
+                    oist = new ObjectInputStream(new FileInputStream(tFile));
+                    tempRepsU = (ArrayList<Report>) oist.readObject();
+                    repsU = (ArrayList<Report>) ois.readObject();
+                    if(tempRepsU.size() <= repsU.size()){
+                        this.reps = repsU;
+                        oist.close();
+                        boolean del = tFile.delete();
+                        System.out.println("Delete:"+del);
+                    }else{
+                        this.reps = tempRepsU;
+                        ObjectOutputStream oos= new ObjectOutputStream(
+                                new FileOutputStream(file));
+                        oos.writeObject(this.reps);
+                        oist.close();
+                        boolean del = tFile.delete();
+                        System.out.println("Delete:"+del);
+                        oos.close();
+                    }
+                    ois.close();
+                }catch (IOException e){
+                    System.out.println("ENTER");
+                    oist = new ObjectInputStream(new FileInputStream(tFile));
+                    this.reps = (ArrayList<Report>) oist.readObject();
+                    System.out.println("+"+this.reps.size());
+                    oist.close();
+                    ObjectOutputStream oos= new ObjectOutputStream(
+                            new FileOutputStream(file));
+                    oos.writeObject(this.reps);
+                    boolean del = tFile.delete();
+                    System.out.println("Delete:"+del);
+                    oos.close();
+                }
+            }else{
+                oist = new ObjectInputStream(new FileInputStream(tFile));
+                this.reps = (ArrayList<Report>) oist.readObject();
+                oist.close();
+                ObjectOutputStream oos= new ObjectOutputStream(
+                        new FileOutputStream(file));
+                oos.writeObject(this.reps);
+                tFile.delete();
+                oos.close();
+            }
         }
 
-        if (fileu.length() == 0){
-            this.allSystemUsers = new HashMap<>();
-            System.out.println("Array is empty. Next update will make it usable.");
-        }
-        else{
-            ObjectInputStream ois = new ObjectInputStream(
-                    new FileInputStream(fileu));
-            this.allSystemUsers = (HashMap<String, Double>) ois.readObject();
-            System.out.println("LOAD SUCCESSFUL");
-            System.out.println("SIZE OF LOAD "+this.allSystemUsers.size());
-            ois.close();
-        }
+        if(!tFileu.exists()){
+            if (fileu.length() == 0){
+                this.allSystemUsers = new ConcurrentHashMap<>();
+                System.out.println("Array is empty. Next update will make it usable.");
+            }
+            else{
+                ois = new ObjectInputStream(new FileInputStream(fileu));
+                this.allSystemUsers = (ConcurrentHashMap<String,Double>) ois.readObject();
+                System.out.println("LOAD SUCCESSFUL");
+                System.out.println("SIZE OF LOAD "+this.allSystemUsers.size());
+                ois.close();
+            }
+        }else{
+            if(fileu.exists()){
+                try{
+                    ois = new ObjectInputStream(new FileInputStream(fileu));
+                    oist = new ObjectInputStream(new FileInputStream(tFileu));
+                    tempU = (ConcurrentHashMap<String,Double>) oist.readObject();
+                    u = (ConcurrentHashMap<String,Double>) ois.readObject();
+                    if(tempU.size() <= u.size()){
+                        this.allSystemUsers = u;
+                        oist.close();
+                        boolean del = tFileu.delete();
+                        System.out.println("Delete:"+del);
+                    }else{
+                        this.allSystemUsers = tempU;
+                        oist.close();
+                        ObjectOutputStream oos= new ObjectOutputStream(
+                                new FileOutputStream(fileu));
+                        oos.writeObject(this.allSystemUsers);
+                        boolean del = tFileu.delete();
+                        System.out.println("Delete:"+del);
+                        oos.close();
+                    }
+                    ois.close();
+                    oist.close();
+                }catch (IOException e){
+                    oist = new ObjectInputStream(new FileInputStream(tFileu));
+                    this.allSystemUsers = (ConcurrentHashMap<String,Double>) oist.readObject();
+                    System.out.println("+"+this.allSystemUsers.size());
+                    oist.close();
+                    ObjectOutputStream oos= new ObjectOutputStream(
+                            new FileOutputStream(fileu));
+                    oos.writeObject(this.allSystemUsers);
+                    boolean del = tFileu.delete();
+                    System.out.println("Delete:"+del);
+                    oos.close();
+                }
+            }else{
+                oist = new ObjectInputStream(new FileInputStream(tFileu));
+                this.allSystemUsers = (ConcurrentHashMap<String,Double>) oist.readObject();
+                oist.close();
+                ObjectOutputStream oos= new ObjectOutputStream(
+                        new FileOutputStream(fileu));
+                oos.writeObject(this.allSystemUsers);
+                tFileu.delete();
+                oos.close();
 
+            }
+        }
     }
+<<<<<<< Updated upstream
+    
+=======
 
+>>>>>>> Stashed changes
     private void updateReports() throws IOException {
 
-        File file=new File("ClientReports.txt");
+        File file=new File("TempClientReports.txt");
         ObjectOutputStream oos= new ObjectOutputStream(
                 new FileOutputStream(file));
         oos.writeObject(this.reps);
         System.out.println("FILE R UPDATED. NEW SIZE "+this.reps.size());
         oos.close();
-
     }
 
     private void updateUsers() throws IOException{
 
-        File file=new File("SystemUsers.txt");
+        File file=new File("TempSystemUsers.txt");
         ObjectOutputStream oos= new ObjectOutputStream(
                 new FileOutputStream(file));
         oos.writeObject(this.allSystemUsers);
         System.out.println("FILE SU UPDATED. NEW SIZE "+this.allSystemUsers.size());
         oos.close();
-
     }
 
     private ArrayList<Report> fetchReports(ClientInterface c, int epoch){
@@ -1116,7 +1260,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public static void main(String args[]) {
         try {
-            Server server = new Server(4,2);
+            Server server = new Server(4,2,1);
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         } catch (NotBoundException e) {

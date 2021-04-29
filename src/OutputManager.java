@@ -10,6 +10,8 @@ public class OutputManager {
     private String dir;
     private String owner;
 
+    //escritas atomicas
+
     public OutputManager(String filename, String fileOwner){
         this.dir = "output/"+filename+".txt";
         this.owner = fileOwner;

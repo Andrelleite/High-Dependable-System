@@ -24,6 +24,7 @@ public class HAClient extends Thread{
     private IdentityHashMap<Integer,Integer> identity;
     private SecretKey symKey;
     private OutputManager fileMan;
+    private int servers;
 
     public void setSymKey(SecretKey symKey) {
         this.symKey = symKey;
@@ -33,10 +34,11 @@ public class HAClient extends Thread{
         return symKey;
     }
 
-    public HAClient() throws IOException, NotBoundException, ClassNotFoundException, NotBoundException, IOException, ClassNotFoundException{
+    public HAClient(int servers) throws IOException, NotBoundException, ClassNotFoundException, NotBoundException, IOException, ClassNotFoundException{
         super();
         this.fileMan = new OutputManager("HA","Health Authority");
         this.fileMan.initFile();
+        this.servers = servers;
     }
 
     private PublicKey loadPublicKey (String keyName) {
@@ -69,10 +71,10 @@ public class HAClient extends Thread{
         return null;
     }
 
-    public void handshake(int op,String user,String x, String y, String epoch){
+    public void handshake(){
         try {
             try {
-                this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+this.servers);
 
                 SecretKey secretKey = KeyGenerator.getInstance("AES").generateKey();
                 String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
@@ -95,9 +97,8 @@ public class HAClient extends Thread{
                 String encryptedKey = Base64.getEncoder().encodeToString(cipherBytes);
 
                 h.HASubscribe(encryptedKey);
-                communicate(this.h, op,user,x,y,epoch);
             }catch (RemoteException | MalformedURLException | NotBoundException e){
-                retry(op,user,x,y,epoch);
+                /*Handled with care*/
             }
         } catch (Exception e) {
             System.out.println("Exception in main: " + e);
@@ -105,14 +106,15 @@ public class HAClient extends Thread{
         }
     }
 
-    private void communicate(ServerInterface h, int op,String user,String x, String y, String epoch) throws IOException, ClassNotFoundException {
+    public void communicate(ServerInterface h, int op,String user,String x, String y, String epoch) throws IOException, ClassNotFoundException {
 
         ArrayList<Report> reports;
         System.setProperty("java.rmi.transport.tcp.responseTimeout", "2000");
         try {
             if(op == 1){
                 /* All users location report at specific location and epoch *test* */
-                this.fileMan.appendInformation(" [REQUEST TO SERVER] USERS AT: "+x+","+y+" IN EPOCH "+epoch+" $$$");
+                this.fileMan.appendInformation("\n");
+                this.fileMan.appendInformation("[REQUEST TO SERVER] USERS AT: "+x+","+y+" IN EPOCH "+epoch+" $$$");
 
                 Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
@@ -170,7 +172,8 @@ public class HAClient extends Thread{
                 }
             }else if(op == 2){
                 /* Specific user report at specific epochs *test* */
-                this.fileMan.appendInformation(" [REQUEST TO SERVER]  LOCATIONS OF USER: "+user+" at epoch "+epoch+" $$$");
+                this.fileMan.appendInformation("\n");
+                this.fileMan.appendInformation("[REQUEST TO SERVER]  LOCATIONS OF USER: "+user+" at epoch "+epoch+" $$$");
 
                 Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                 cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
@@ -211,11 +214,11 @@ public class HAClient extends Thread{
 
                     re.setWitness(witness);
 
-                    /*byte[] hashBytes4 = java.util.Base64.getDecoder().decode(re.getUsername());
+                    byte[] hashBytes4 = java.util.Base64.getDecoder().decode(re.getUsername());
                     byte[] chunk3 = rsaCipher.doFinal(hashBytes4);
                     String username =  new String(chunk3, UTF_8);
 
-                    re.setUsername(username);*/
+                    re.setUsername(username);
 
                     j++;
                     this.fileMan.appendInformation("\t\t ====== REPORT #"+j);
@@ -268,7 +271,7 @@ public class HAClient extends Thread{
         thread.start();
         thread.join();
         if(this.h == null){
-            this.fileMan.appendInformation("SERVICE IS DOWN. COME BACK LATER.");
+            this.fileMan.appendInformation("\nSERVICE IS DOWN. COME BACK LATER.");
             return;
         }else{
             communicate(this.h,op,user,x,y,epoch);
@@ -282,7 +285,7 @@ public class HAClient extends Thread{
             this.fileMan.appendInformation("New try.");
             try {
                 Thread.sleep(2000);
-                this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+this.servers);
             } catch (InterruptedException e) {
                 /*exit*/
             } catch (RemoteException | MalformedURLException | NotBoundException e){
@@ -292,11 +295,15 @@ public class HAClient extends Thread{
         }
     }
 
+    public ServerInterface getServerInterface(){
+        return this.h;
+    }
+
     //====================================MAIN==========================================================================
 
     public static void main(String[] args) throws NotBoundException, IOException, ClassNotFoundException {
-        HAClient ha = new HAClient();
-        ha.handshake(1,"","30","37","0");
-        ha.handshake(1,"","30","37","0");
+        HAClient ha = new HAClient(6);
+        //ha.handshake(1,"","30","37","0");
+        //ha.handshake(1,"","30","37","0");
     }
 }

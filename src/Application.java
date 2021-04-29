@@ -19,14 +19,18 @@ class Simulation{
     private List<HAClient> authorities;
     private Map<String,Integer> clientEpochs;
     private List<Client> clients;
-    private Server server;
+    private List<Server> servers;
     private List<Thread> workers;
+    private List<String> clientsName;
     private int fileNumber;
+    private String N;
+
 
     public Simulation(Map<String,Integer> clientEpochs, List<Client> clients, int filenumber) throws IOException, NotBoundException, InterruptedException, ClassNotFoundException {
         this.byzantines = new ArrayList<>();
         this.authorities = new ArrayList<>();
         this.workers = new ArrayList<>();
+        this.servers = new ArrayList<>();
         this.clientEpochs = clientEpochs;
         this.clients = clients;
         this.epoch = "0";
@@ -34,12 +38,21 @@ class Simulation{
         simulate("simulate"+filenumber);
     }
 
-    private void startServer() throws NotBoundException, IOException, ClassNotFoundException {
-        try {
-            this.server = new Server(this.f,this.fline);
-        }  catch (NotBoundException | IOException | ClassNotFoundException e) {
-            e.printStackTrace();
+    private void startServer(String cardinal) throws NotBoundException, IOException, ClassNotFoundException {
+
+        N = cardinal.strip().split(",")[1];
+        int n = Integer.parseInt(cardinal.strip().split(",")[1]);
+
+        for(int i = 0; i < n; i++){
+            try {
+                System.out.println("Starting server replica number "+(i+1));
+                this.servers.add(new Server(this.f,this.fline,i+1));
+            }  catch (NotBoundException | IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+            }
         }
+
+
     }
 
     private void startClients(){
@@ -56,7 +69,7 @@ class Simulation{
             if(byz == 0){
                 try {
                     System.out.println("-------- NEW CLIENT "+username+" -------");
-                    Client client = new Client(this.fileNumber);
+                    Client client = new Client(this.fileNumber,Integer.parseInt(this.N));
                     String url = "rmi://127.0.0.1:7001/" + username;
                     Naming.rebind(url, client);
                     client.setUsername(username);
@@ -73,6 +86,31 @@ class Simulation{
 
     }
 
+    private void setClientsName (){
+        List<String> clientsNames = new ArrayList<>();
+
+        Iterator<Client> itr = this.clients.iterator();
+        while (itr.hasNext()) {
+            Client client = itr.next();
+            if(!clientsNames.contains(client.getUsername())){
+                clientsNames.add(client.getUsername());
+            }
+        }
+
+        Iterator<Byzantine> itrb = this.byzantines.iterator();
+        while (itrb.hasNext()) {
+            Byzantine client = itrb.next();
+            if(!clientsNames.contains(client.getUsername())){
+                clientsNames.add(client.getUsername());
+            }
+        }
+
+        clientsNames.add("ha");
+
+        clientsName = clientsNames;
+
+    }
+
     private int setValue(String regex){
         int value;
         value = Integer.parseInt(regex.split(",")[1]);
@@ -81,7 +119,7 @@ class Simulation{
 
     private void setByzantines(String regex) throws RemoteException, MalformedURLException, NotBoundException {
         String username = regex.split(",")[0];
-        Byzantine bad = new Byzantine(this.fileNumber);
+        Byzantine bad = new Byzantine(this.fileNumber,Integer.parseInt(this.N));
         System.out.println("------Setting Byzantine user: "+username+"------");
         bad.setUsername(username);
         String url = "rmi://127.0.0.1:7001/" + username;
@@ -163,7 +201,8 @@ class Simulation{
         for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
             if(this.byzantines.get(i).getUsername().equals(username)){
                 original = this.byzantines.get(i).getUsername();
-                this.byzantines.get(i).getFileMan().appendInformation("\t\tTRYING TO FAKE IDENTITY FROM "+username+" TO "+target);
+                this.byzantines.get(i).getFileMan().appendInformation("\n");
+                this.byzantines.get(i).getFileMan().appendInformation(" TRYING TO FAKE IDENTITY FROM "+username+" TO "+target);
                 this.byzantines.get(i).setUsername(target,original);
                 this.byzantines.get(i).setRequestLocationProof();
                 this.byzantines.get(i).setUsername(original,original);
@@ -179,7 +218,8 @@ class Simulation{
         for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
             if(this.byzantines.get(i).getUsername().equals(byz)){
                 original = this.byzantines.get(i).getUsername();
-                this.byzantines.get(i).getFileMan().appendInformation("\t\tTRYING TO FAKE IDENTITY FROM "+byz+" TO "+victim);
+                this.byzantines.get(i).getFileMan().appendInformation("\n");
+                this.byzantines.get(i).getFileMan().appendInformation(" TRYING TO FAKE IDENTITY FROM "+byz+" TO "+victim);
                 this.byzantines.get(i).setUsername(victim,original);
                 this.byzantines.get(i).getReports(epoch);
                 this.byzantines.get(i).setUsername(original,original);
@@ -217,7 +257,8 @@ class Simulation{
             if(!this.epoch.equals(request)){
                 this.epoch = request;
                 System.out.println("EPOCH MOVED TO "+this.epoch);
-                this.server.verifyF(Integer.parseInt(this.epoch)-1);
+                /*Server need correction*/
+                this.servers.get(0).verifyF(Integer.parseInt(this.epoch)-1);
             }
             try {
                 sendProofReq();
@@ -241,7 +282,7 @@ class Simulation{
         }else if(request.startsWith("user")){
             if(origin.equals("ha")){
                 user = regex.split(",")[1];
-                this.authorities.get(0).handshake(2,user,"0","0",generated[2]);
+                this.authorities.get(0).communicate(this.authorities.get(0).getServerInterface(),2,user,"0","0",generated[2]);
                 System.out.println("HA is requesting "+user+" location.");
             }
         }else if(request.equals("position")){
@@ -250,16 +291,18 @@ class Simulation{
             epoch = regex.split(",")[4];
             if(origin.equals("ha")){
                 System.out.println("HA is requesting users history at this location: ("+x+","+y+") at epoch "+ epoch);
-                this.authorities.get(0).handshake(1,"none",x,y,epoch);
+                this.authorities.get(0).communicate(this.authorities.get(0).getServerInterface(),1,"",x,y,epoch);
             }
-        }else if(request.equals("down")){
+        }/*else if(request.equals("down")){
             System.out.println("Simulate Server Crash or Connection drop.");
-            this.server.shutdown();
-            this.server = null;
+            this.servers.get(0).shutdown();
         }else if(request.equals("up")){
             System.out.println("Turn on Server.");
-            startServer();
-        }else if(origin.equals("spy")){
+            startServer(this.N);
+            setClientsName();
+            this.servers.get(0).setClients(clientsName);
+            this.servers.get(0).loadSymmetricKeys();
+        }*/else if(origin.equals("spy")){
             if(request.equals("report")){
                 spyOnReports(generated[2],generated[3],generated[4]);
             }
@@ -279,16 +322,19 @@ class Simulation{
             String line = reader.nextLine();
 
             if(lineCounter == 0){
+                startServer(line);
+                System.out.println("======================ALL SERVERS ARE ONLINE======================");
+            }else if(lineCounter == 1){
                 this.f = setValue(line);
                 this.fline = Integer.parseInt(line.split(",")[2]);
                 System.out.println("F: "+this.f+" F': "+this.fline);
-                startServer();
-            }else if(lineCounter == 1){
-                this.u = setValue(line);
             }else if(lineCounter == 2){
+                this.u = setValue(line);
+            }else if(lineCounter == 3){
                 this.ha = setValue(line);
-                HAClient ha = new HAClient();
+                HAClient ha = new HAClient(Integer.parseInt(this.N));
                 this.authorities.add(ha);
+                this.authorities.get(0).handshake();
             }else if(lineCounter < this.f+3){
                 setByzantines(line);
             }else if(line.equals("endsim")){
@@ -321,7 +367,8 @@ class Simulation{
             }
             lineCounter++;
         }
-        this.server.verifyF(Integer.parseInt(this.epoch));
+        /*Server need correction*/
+        this.servers.get(0).verifyF(Integer.parseInt(this.epoch));
         for(int i = 0; i < this.workers.size(); i++){
             this.workers.get(i).join();
         }
@@ -403,6 +450,14 @@ public class Application {
         int flag = 0;
         int lineCounter = 0;
 
+        PrintWriter writer = new PrintWriter("ClientReports.txt");
+        writer.print("");
+        writer.close();
+
+        writer = new PrintWriter("SystemUsers.txt");
+        writer.print("");
+        writer.close();
+
 
         System.out.print("NUMBER OF SIMULATION: ");
         Scanner scan = new Scanner(System.in);
@@ -413,7 +468,7 @@ public class Application {
         Scanner reader = new Scanner(s);
         while (reader.hasNextLine() && flag == 0) {
             String line = reader.nextLine();
-            if(lineCounter == 1) {
+            if(lineCounter == 2) {
                 numberOfUsers = Integer.parseInt(line.split(",")[1]);
                 flag = 1;
             }

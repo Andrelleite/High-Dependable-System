@@ -60,6 +60,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     private List<String> clientsWithError = new ArrayList<String>();
     private OutputManager fileMan;
     private int gridNumber;
+    private int servers;
 
     public Map<Integer, Pair<Integer, Integer>> getMoveList() {
         return moveList;
@@ -147,7 +148,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         }
         // REPORT SUBMISSION
         try{
-            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+
+            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
 
             SecretKey secretKey = KeyGenerator.getInstance("AES").generateKey();
             String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
@@ -214,9 +216,10 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         this.username = username;
     }
 
-    public Client(int grid) throws RemoteException {
+    public Client(int grid, int servers) throws RemoteException {
         super();
         this.gridNumber = grid;
+        this.servers = servers;
     }
 
     public int getGridNumber(){
@@ -237,7 +240,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     public void loadMoves() {
         try {
-            //coordenadas falsas
+            //coordenadas falsa
             int grid = getGridNumber();
             File myObj = new File("src/grid/grid"+grid+".txt");
             Scanner reader = new Scanner(myObj);
@@ -310,8 +313,27 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         return null;
     }
 
-    public Report generateLocationReportWitness(ClientInterface c, String username, int userEpoch) throws RemoteException{
+    public Report generateLocationReportWitness(ClientInterface c, String username, int userEpoch, String signature, String timestamp) throws RemoteException{
         try {
+            this.fileMan.appendInformation("\n");
+            this.fileMan.appendInformation(" [REQUEST TO BE WITNESS]  PROOF OF LOCATION FROM " + username);
+            String verifyRet = verifySenderSignature(username, signature,String.valueOf(userEpoch),timestamp);
+            if(verifyRet.equals(("Error"))){
+                this.fileMan.appendInformation("\t\t\treport sender signature is wrong");
+                return null;
+            }
+
+            //Get time
+            LocalTime clientTime = LocalTime.now();
+
+            LocalTime senderTime = LocalTime.parse(timestamp);
+            //4 segundos para possíveis atrasos na rede
+            LocalTime clientTimeThreshold = clientTime.plusSeconds(4);
+            if(clientTimeThreshold.compareTo(senderTime) < 0){
+                this.fileMan.appendInformation("\t\t\tPossilble replay attack");
+                return null;
+            }
+
             int grid = getGridNumber();
             File myObj = new File("src/grid/grid"+grid+".txt");
             Scanner reader = new Scanner(myObj);
@@ -375,6 +397,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             //byte[] infoBytes = Base64.getDecoder().decode(info);
                             byte[] cipherBytes1 = cipherReport.doFinal(info.getBytes());
                             String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                            this.fileMan.appendInformation("\t\tSENDER SIGNATURE: TIME: " + timestamp + " | SIGNATURE: " + signature);
 
                             Report userReport = new Report(c,-1,-1,userEpoch,username,"","",this.getUsername(),signedHash,time,loc);
                             return userReport;
@@ -495,11 +519,55 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         return "Error";
     }
 
+    public String verifySenderSignature(String user, String digitalSignature, String epoch, String time) {
+        try {
+
+            PublicKey pub = loadPublicKey(user);
+
+            //String s01 =  time1 + user + epoch;
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, pub);
+            byte[] hashBytes1 = java.util.Base64.getDecoder().decode(digitalSignature);
+            byte[] chunk = rsaCipher.doFinal(hashBytes1);
+            String signature = Base64.getEncoder().encodeToString(chunk);
+
+            String verifyHash =  time + user + epoch;
+            byte[] messageByte1 = verifyHash.getBytes();
+            MessageDigest digest1 = MessageDigest.getInstance("SHA-256");
+            digest1.update(messageByte1);
+            byte[] digestByte1 = digest1.digest();
+            String digest64si = Base64.getEncoder().encodeToString(digestByte1);
+
+            if(signature.equals(digest64si)){
+                return "Correct";
+            }else{
+                return "Error";
+            }
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            System.out.println("Wrong signature");
+            e.printStackTrace();
+            return "Error";
+        } catch (InvalidKeyException e) {
+            System.out.println("Wrong signature");
+            e.printStackTrace();
+            return "Error";
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+
     public void requestLocationProof() throws InterruptedException, IOException, ClassNotFoundException {
 
         ArrayList<String> usersToContact = findUser();
         Report message = null;
         String serverSignature = "";
+        this.fileMan.appendInformation("\n");
         this.fileMan.appendInformation(" [REQUEST TO SERVER]  PROOF OF LOCATION");
         if(usersToContact.size() != 0){
             Iterator i = usersToContact.iterator();
@@ -508,7 +576,30 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                 this.fileMan.appendInformation("\t\t"+this.username + " trying to contact " + userToContact);
                 try {
                     ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + userToContact);
-                    message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.getEpoch());
+
+                    //Get time
+                    String time1 = java.time.LocalTime.now().toString();
+
+                    String s01 =  time1 + this.getUsername() + this.getEpoch(); //+ this.getCoordinate1() + this.getCoordinate2();
+
+                    PrivateKey priv1 = loadPrivKey(this.getUsername());
+
+                    //Hash message
+                    byte[] messageByte01 = s01.getBytes();
+                    MessageDigest digest01 = MessageDigest.getInstance("SHA-256");
+                    digest01.update(messageByte01);
+                    byte[] digestByte01 = digest01.digest();
+                    String digest641 = Base64.getEncoder().encodeToString(digestByte01);
+
+                    //sign the hash with the witness' private key
+                    Cipher cipherHash1 = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                    cipherHash1.init(Cipher.ENCRYPT_MODE, priv1);
+                    byte[] hashBytes1 = Base64.getDecoder().decode(digest641);
+                    byte[] finalHashBytes1 = cipherHash1.doFinal(hashBytes1);
+                    String digitalSignature = Base64.getEncoder().encodeToString(finalHashBytes1);
+
+
+                    message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.getEpoch(),digitalSignature,time1);
                     if(message == null){
 
                         this.fileMan.appendInformation("\t\t\treport is null");
@@ -613,7 +704,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
                     // REPORT SUBMISSION
                     try{
-                        ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                        ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
                         serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
                         this.fileMan.appendInformation("\t\tSERVER SIGNATURE:" + serverSignature);
                         System.out.println("SERVER SIGNATURE:" + serverSignature);
@@ -729,7 +820,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     public void getReports(String ep) throws RemoteException{
 
         try {
-            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
 
             //get server public key
             /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
@@ -752,6 +843,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             ServerReturn r = s.obtainLocationReport(this.getClientInterface(),loc3,this.getUsername());
 
             if(r.getReports() == null || r.getServerProof() == null){
+                this.fileMan.appendInformation("\n");
                 this.fileMan.appendInformation(" [REQUEST TO SERVER]  MY REPORTS");
                 this.fileMan.appendInformation(" [REQUEST TO SERVER]  DENIED");
                 return;
@@ -803,7 +895,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             }else {
                 System.out.println("SERVER SIGN HASH DOESN'T MATCH THE DATA (GET REPORTS)");
             }
-
+            this.fileMan.appendInformation("\n");
             this.fileMan.appendInformation(" [REQUEST TO SERVER]  MY REPORTS");
             int j = 0;
             Iterator i = r.getReports().iterator();
@@ -818,7 +910,9 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
                 re.setPosX(Integer.parseInt(info.split("w")[0].split("q")[1]));
                 re.setPosY(Integer.parseInt(info.split("w")[1].split("q")[1]));
-                re.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
+                //re.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
+
+                re.setEpoch(Integer.parseInt(ep));
 
                 byte[] hashBytes3 = java.util.Base64.getDecoder().decode(re.getWitness());
                 byte[] chunk2 = rsaCipher.doFinal(hashBytes3);
@@ -871,7 +965,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         Thread thread = new Thread(this);
         thread.start();
         thread.join();
-        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
         serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
         return serverSignature;
     }
@@ -881,7 +975,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         Thread thread = new Thread(this);
         thread.start();
         thread.join();
-        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
         s.subscribe(this.getClientInterface(),this.getUsername(), this.getKey());
     }
 
@@ -893,7 +987,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             System.out.println("New try.");
             try {
                 Thread.sleep(2000);
-                s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
             } catch (InterruptedException e) {
                 /*exit*/
             } catch (RemoteException | MalformedURLException | NotBoundException e){
