@@ -978,14 +978,21 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     tempRepsU = (ArrayList<Report>) oist.readObject();
                     repsU = (ArrayList<Report>) ois.readObject();
                     if(tempRepsU.size() <= repsU.size()){
-                        tFile.delete();
                         this.reps = repsU;
+                        oist.close();
+                        boolean del = tFile.delete();
+                        System.out.println("Delete:"+del);
                     }else{
-                        boolean success = tFile.renameTo(file);
                         this.reps = tempRepsU;
+                        ObjectOutputStream oos= new ObjectOutputStream(
+                                new FileOutputStream(file));
+                        oos.writeObject(this.reps);
+                        oist.close();
+                        boolean del = tFile.delete();
+                        System.out.println("Delete:"+del);
+                        oos.close();
                     }
                     ois.close();
-                    oist.close();
                 }catch (IOException e){
                     System.out.println("ENTER");
                     oist = new ObjectInputStream(new FileInputStream(tFile));
@@ -1031,11 +1038,19 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     tempU = (ConcurrentHashMap<String,Double>) oist.readObject();
                     u = (ConcurrentHashMap<String,Double>) ois.readObject();
                     if(tempU.size() <= u.size()){
-                        tFileu.delete();
                         this.allSystemUsers = u;
+                        oist.close();
+                        boolean del = tFileu.delete();
+                        System.out.println("Delete:"+del);
                     }else{
-                        boolean success = tFileu.renameTo(fileu);
                         this.allSystemUsers = tempU;
+                        oist.close();
+                        ObjectOutputStream oos= new ObjectOutputStream(
+                                new FileOutputStream(fileu));
+                        oos.writeObject(this.allSystemUsers);
+                        boolean del = tFileu.delete();
+                        System.out.println("Delete:"+del);
+                        oos.close();
                     }
                     ois.close();
                     oist.close();
@@ -1062,10 +1077,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 oos.close();
 
             }
-
         }
-
     }
+    
     private void updateReports() throws IOException {
 
         File file=new File("ClientReports.txt");
