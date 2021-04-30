@@ -1,7 +1,6 @@
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
-import java.lang.reflect.Array;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
@@ -24,6 +23,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     public  ConcurrentHashMap<String,SecretKey> symKey;
     private ConcurrentHashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
     private ArrayList<Report> reps; // Structure of all reports in the system
+    private ArrayList<ServerInterface> replicas;
     private ServerInterface server;
     private OutputManager fileMan;
     private List<String> clients;
@@ -32,18 +32,21 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private int portRMI;
     private int[] f;
     private long id;
+    private int network;
 
     //=======================CONNECTION=================================================================================
 
-    public Server(int f, int fline, long id) throws IOException, NotBoundException, ClassNotFoundException {
+    public Server(int f, int fline, long id, int net) throws IOException, NotBoundException, ClassNotFoundException {
 
         this.f = new int[2];
         this.f[0] = f;
         this.f[1] = fline;
         this.id = id;
+        this.network = net;
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
         this.symKey = new ConcurrentHashMap<>();
+        this.replicas = new ArrayList<>();
         this.fileMan = new OutputManager("Server"+this.id,"Server"+this.id);
         this.fileMan.initFile();
         synchronize(); // Updates the reports in list to the latest in file
@@ -897,6 +900,29 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     }
 
+    //=======================INTRA-SERVER-COMMS=========================================================================
+
+    public String serverHello(long n) throws RemoteException{
+        System.out.println(">>>"+this.id+">>> "+"Got an hello message from replica "+n);
+        return "Hello from replica "+this.id;
+    }
+
+    public void connectToNetwork(){
+        ServerInterface s;
+        for(int i = 0; i < this.network; i++){
+            if((i+1) != this.id){
+                try {
+                    s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(i+1));
+                    System.out.println(">>>"+this.id+">>> "+s.serverHello(this.id));
+                    this.replicas.add(s);
+                } catch (NotBoundException | MalformedURLException | RemoteException e) {
+                    System.out.println("SHIT.");
+                }
+            }
+        }
+        System.out.println("NETWORK SIZE: "+this.replicas.size());
+    }
+
     //=======================DATA-FILES-METHODS=========================================================================
 
     private boolean checkClone(Report report){
@@ -1077,11 +1103,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             }
         }
     }
-<<<<<<< Updated upstream
-    
-=======
 
->>>>>>> Stashed changes
     private void updateReports() throws IOException {
 
         File file=new File("TempClientReports.txt");
@@ -1260,7 +1282,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     public static void main(String args[]) {
         try {
-            Server server = new Server(4,2,1);
+            Server server = new Server(4,2,1,5);
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         } catch (NotBoundException e) {

@@ -46,12 +46,15 @@ class Simulation{
         for(int i = 0; i < n; i++){
             try {
                 System.out.println("Starting server replica number "+(i+1));
-                this.servers.add(new Server(this.f,this.fline,i+1));
+                this.servers.add(new Server(this.f,this.fline,(i+1),n));
             }  catch (NotBoundException | IOException | ClassNotFoundException e) {
-                e.printStackTrace();
+                System.out.println("SHIT.");
             }
         }
 
+        for(int i = 0; i < n; i++){
+            this.servers.get(i).connectToNetwork();
+        }
 
     }
 
