@@ -1,0 +1,9 @@
+s,6
+f,2,1
+u,5
+ha,1
+user2,b
+user4,b
+setupclients
+generateproofs,0
+endsim
