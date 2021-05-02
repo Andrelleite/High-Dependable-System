@@ -39,6 +39,7 @@ class Simulation{
     private void startServer() throws NotBoundException, IOException, ClassNotFoundException {
         try {
             this.server = new Server(this.f,this.fline);
+            server.setPassword("server");
         }  catch (NotBoundException | IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }
@@ -62,6 +63,7 @@ class Simulation{
                     String url = "rmi://127.0.0.1:7001/" + username;
                     Naming.rebind(url, client);
                     client.setUsername(username);
+                    client.setPassword(username);
                     ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + username);
                     client.setClientInterface(h);
                     client.loadMoves();
@@ -111,6 +113,7 @@ class Simulation{
         Byzantine bad = new Byzantine(this.fileNumber);
         System.out.println("------Setting Byzantine user: "+username+"------");
         bad.setUsername(username);
+        bad.setPassword(username);
         String url = "rmi://127.0.0.1:7001/" + username;
         Naming.rebind(url, bad);
         ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + username);
@@ -291,6 +294,7 @@ class Simulation{
             setClientsName();
             server.setClients(clientsName);
             server.loadSymmetricKeys();
+            server.setPassword("server");
         }else if(origin.equals("spy")){
             if(request.equals("report")){
                 spyOnReports(generated[2],generated[3],generated[4]);

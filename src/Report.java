@@ -11,23 +11,23 @@ public class Report implements Serializable {
     private int posY;
     private int epoch;
     private String encryptedInfo;
-    private String timeStamp;
-    private String witnessTimeStamp;
+    private int Nonce;
+    private int witnessNonce;
     private String witnessPos;
     private int posXWitness;
     private int posYWitness;
 
-    public Report(ClientInterface cl, int x, int y, int ep, String user, String userSignature, String timeStamp, String witness, String witnessSignature, String witnessTimeStamp, String witnessPos) {
+    public Report(ClientInterface cl, int x, int y, int ep, String user, String userSignature, int Nonce, String witness, String witnessSignature, int witnessNonce, String witnessPos) {
         this.c = cl;
         this.posX = x;
         this.posY = y;
         this.epoch = ep;
         this.username = user;
         this.userSignature = userSignature;
-        this.timeStamp = timeStamp;
+        this.Nonce = Nonce;
         this.witness = witness;
         this.witnessSignature = witnessSignature;
-        this.witnessTimeStamp = witnessTimeStamp;
+        this.witnessNonce = witnessNonce;
         this.witnessPos = witnessPos;
     }
 
@@ -67,24 +67,24 @@ public class Report implements Serializable {
         return witnessSignature;
     }
 
-    public String getTimeStamp() {
-        return timeStamp;
+    public int getNonce() {
+        return Nonce;
     }
 
     public String getUserSignature() {
         return userSignature;
     }
 
-    public String getWitnessTimeStamp() {
-        return witnessTimeStamp;
+    public int getWitnessNonce() {
+        return witnessNonce;
     }
 
     public void setUserSignature(String userSignature) {
         this.userSignature = userSignature;
     }
 
-    public void setTimeStamp(String timeStamp) {
-        this.timeStamp = timeStamp;
+    public void setNonce(int Nonce) {
+        this.Nonce = Nonce;
     }
 
     public void setEncryptedInfo(String encryptedInfo) {

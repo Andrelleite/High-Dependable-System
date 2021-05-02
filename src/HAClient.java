@@ -221,11 +221,11 @@ public class HAClient extends Thread{
                     j++;
                     this.fileMan.appendInformation("\t\t ====== REPORT #"+j);
                     this.fileMan.appendInformation("\t\t\tRECEIVED THE SERVER PROOF OF LOCATION FROM - "+ re.getUsername());
-                    this.fileMan.appendInformation("\t\t\tUSER SIGNATURE: " + re.getUserSignature() + "TIMESTAMP: " + re.getTimeStamp());
+                    this.fileMan.appendInformation("\t\t\tUSER SIGNATURE: " + re.getUserSignature() + "NONCE: " + re.getNonce());
                     this.fileMan.appendInformation("\t\t\tPOS: (" + re.getPosX() + "," + re.getPosY() + ") AT EPOCH " + re.getEpoch());
                     this.fileMan.appendInformation("\t\t\tWITNESS: " + re.getWitness());
                     this.fileMan.appendInformation("\t\t\tWITNESS SIGNATURE: " + re.getWitnessSignature());
-                    this.fileMan.appendInformation("\t\t\tWITNESS TIMESTAMP: " + re.getWitnessTimeStamp());
+                    this.fileMan.appendInformation("\t\t\tWITNESS NONCE: " + re.getWitnessNonce());
 
                 }
 

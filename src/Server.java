@@ -13,8 +13,6 @@ import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.time.LocalTime;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,8 +22,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
+    private String password;
     public  ConcurrentHashMap<String,SecretKey> symKey;
     private ConcurrentHashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
+    public  ConcurrentHashMap<String,Integer> sendNonce = new ConcurrentHashMap<String, Integer>();
+    public  ConcurrentHashMap<String,Integer> receiveNonce= new ConcurrentHashMap<String, Integer>();
     private ArrayList<Report> reps; // Structure of all reports in the system
     private ServerInterface server;
     private OutputManager fileMan;
@@ -34,6 +35,14 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private String IPV4;
     private int portRMI;
     private int[] f;
+
+    public void setPassword(String password){
+        this.password = password;
+    }
+
+    public String getPassword(){
+        return password;
+    }
 
     //=======================CONNECTION=================================================================================
 
@@ -237,8 +246,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         try {
             KeyStore keyStore = KeyStore.getInstance("JKS");
             InputStream readStream = new FileInputStream("src/keys/" + keyName +".keystore");
-            keyStore.load(readStream, (keyName + "key").toCharArray());
-            KeyStore.PrivateKeyEntry entry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyName, new KeyStore.PasswordProtection((keyName + "key").toCharArray()));
+            keyStore.load(readStream, (getPassword() + "key").toCharArray());
+
+            KeyStore.PrivateKeyEntry entry = (KeyStore.PrivateKeyEntry) keyStore.getEntry(keyName, new KeyStore.PasswordProtection((getPassword() + "key").toCharArray()));
             PrivateKey pk = entry.getPrivateKey();
             //System.out.println("PRIV KEY " + pk);
             return pk;
@@ -359,11 +369,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     if(verifyRet.equals("Correct") && !checkClone(locationReport)){
                         filer.appendInformation("\t\t\tRECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
                         filer.appendInformation("\t\t\tUSER SIGNATURE: " + locationReport.getUserSignature());
-                        filer.appendInformation("\t\t\tTIMESTAMP: " + locationReport.getTimeStamp());
+                        filer.appendInformation("\t\t\tNONCE: " + locationReport.getNonce());
                         filer.appendInformation("\t\t\tPOS: (" + locationReport.getPosX() + "," + locationReport.getPosY() + ") AT EPOCH " + locationReport.getEpoch());
                         filer.appendInformation("\t\t\tWITNESS: " + locationReport.getWitness());
                         filer.appendInformation("\t\t\tWITNESS SIGNATURE: " + locationReport.getWitnessSignature());
-                        filer.appendInformation("\t\t\tWITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
+                        filer.appendInformation("\t\t\tWITNESS NONCE: " + locationReport.getWitnessNonce());
                         filer.appendInformation("\t\t\tWITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
 
                         reps.add(locationReport);
@@ -371,22 +381,16 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                             updateReports();
 
-                            //Get time
-                            String time = java.time.LocalTime.now().toString();
+                            int nonceSend = 1;
+                            if(!sendNonce.containsKey(user)){
+                                sendNonce.put(user, nonceSend);
+                            }else {
+                                nonceSend = sendNonce.get(user);
+                                nonceSend += 1;
+                                sendNonce.replace(user, nonceSend);
+                            }
 
-                            String s1 = user + time + locationReport.getEpoch();
-
-                            //get server private key
-                        /*
-                        FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
-                        byte[] encoded1 = new byte[fis0.available()];
-                        fis0.read(encoded1);
-                        fis0.close();
-                        PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
-                        KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-                        PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
-
-                         */
+                            String s1 = user + nonceSend + locationReport.getEpoch();
 
                             PrivateKey priv = loadPrivKey("server");
 
@@ -404,7 +408,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                             byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
                             String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
-                            serverReturn[0] = "time: " + time + " | signature: " + signedHash;
+                            serverReturn[0] = "nonce: " + nonceSend + " | signature: " + signedHash;
+                            String time = java.time.LocalTime.now().toString();
                             filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
                             filer.appendInformation("\t\t SIGNATURE: " + signedHash);
 
@@ -488,10 +493,16 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         reports = fetchReports(c, ep[0]);
                     }
 
-                    //Get time
-                    String time = java.time.LocalTime.now().toString();
+                    int nonceSend = 1;
+                    if(!sendNonce.containsKey(username)){
+                        sendNonce.put(username, nonceSend);
+                    }else {
+                        nonceSend = sendNonce.get(username);
+                        nonceSend += 1;
+                        sendNonce.replace(username, nonceSend);
+                    }
 
-                    String s1 = username + time + ep[0];
+                    String s1 = username + nonceSend + ep[0];
 
                     String finalS = "";
 
@@ -523,7 +534,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                                 byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
                                 String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
 
-                                Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessTimeStamp(),r.getWitnessPos());
+                                Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getNonce(),loc3,r.getWitnessSignature(),r.getWitnessNonce(),r.getWitnessPos());
                                 n.setEncryptedInfo(loc);
 
                                 returnReport.add(n);
@@ -562,7 +573,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
                         String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
-                        finalS = "time: " + time + " | signature: " + signedHash;
+                        finalS = "nonce: " + nonceSend + " | signature: " + signedHash;
+                        String time = java.time.LocalTime.now().toString();
                         filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
                         filer.appendInformation("\t\t SIGNATURE: " + signedHash);
                     }
@@ -585,9 +597,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 else{
                     serverReturn[0] = new ServerReturn(null,null);
                 }
-
-
-
             }
         };
         worker.start();
@@ -650,10 +659,16 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 filer.appendInformation("\t\t\tREQUEST SIZE :"+clientReports.size());
                 filer.appendInformation("\t\t\tREQUEST COMPLETE");
 
-                //Get time
-                String time = java.time.LocalTime.now().toString();
+                int nonceSend = 1;
+                if(!sendNonce.containsKey(userFinal)){
+                    sendNonce.put(userFinal, nonceSend);
+                }else {
+                    nonceSend = sendNonce.get(userFinal);
+                    nonceSend += 1;
+                    sendNonce.replace(userFinal, nonceSend);
+                }
 
-                String s1 = "ha" + userFinal + time + epochFinal;
+                String s1 = "ha" + userFinal + nonceSend + epochFinal;
 
                 String finalS = "";
 
@@ -688,7 +703,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
                         String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
 
-                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessTimeStamp(),r.getWitnessPos());
+                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getNonce(),loc3,r.getWitnessSignature(),r.getWitnessNonce(),r.getWitnessPos());
                         n.setEncryptedInfo(loc);
 
                         returnReport.add(n);
@@ -696,15 +711,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         //r.setUsername(loc4);
                     }
 
-
-                    //get client private key
-                    /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
-                    byte[] encoded1 = new byte[fis0.available()];
-                    fis0.read(encoded1);
-                    fis0.close();
-                    PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
-                    KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);*/
                     PrivateKey priv = loadPrivKey("server");
 
                     //Hash message
@@ -721,7 +727,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
-                    finalS = "time: " + time + " | signature: " + signedHash;
+                    finalS = "nonce: " + nonceSend + " | signature: " + signedHash;
                 } catch (NoSuchAlgorithmException e) {
                     e.printStackTrace();
                 } catch (InvalidKeyException e) {
@@ -806,10 +812,16 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 filer.appendInformation("\t\t\tREQUEST COMPLETE");
 
 
-                //Get time
-                String time = java.time.LocalTime.now().toString();
+                int nonceSend = 1;
+                if(!sendNonce.containsKey("ha")){
+                    sendNonce.put("ha", nonceSend);
+                }else {
+                    nonceSend = sendNonce.get("ha");
+                    nonceSend += 1;
+                    sendNonce.replace("ha", nonceSend);
+                }
 
-                String s1 = "ha" + posi[0] + posi[1] + time + ep[0];
+                String s1 = "ha" + posi[0] + posi[1] + nonceSend + ep[0];
 
                 String finalS = "";
 
@@ -844,22 +856,13 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
                         String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
 
-                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessTimeStamp(),r.getWitnessPos());
+                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getNonce(),loc3,r.getWitnessSignature(),r.getWitnessNonce(),r.getWitnessPos());
                         n.setEncryptedInfo(loc);
 
                         returnReport.add(n);
 
                         //r.setUsername(loc4);
                     }
-
-                    //get client private key
-                    /*FileInputStream fis0 = new FileInputStream("src/keys/serverPriv.key");
-                    byte[] encoded1 = new byte[fis0.available()];
-                    fis0.read(encoded1);
-                    fis0.close();
-                    PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
-                    KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
-                    PrivateKey priv = keyFacPriv.generatePrivate(privSpec);*/
 
                     PrivateKey priv = loadPrivKey("server");
 
@@ -877,7 +880,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
-                    finalS = "time: " + time + " | signature: " + signedHash;
+                    finalS = "nonce: " + nonceSend + " | signature: " + signedHash;
                 } catch (NoSuchAlgorithmException e) {
                     e.printStackTrace();
                 } catch (InvalidKeyException e) {
@@ -1155,15 +1158,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     private String verifyLocationReport(ClientInterface c,String user, Report locationReport) {
         //witness signature
         try {
-            /*FileInputStream fis1 = new FileInputStream("src/keys/" + locationReport.getWitness() + "Pub.key");
-            byte[] decoded1 = new byte[fis1.available()];
-            fis1.read(decoded1);
-            fis1.close();
-            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
-            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
-            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
 
-             */
             PublicKey pub = loadPublicKey(locationReport.getWitness());
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -1172,7 +1167,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             byte[] chunk = rsaCipher.doFinal(hashBytes1);
             String witSignature = Base64.getEncoder().encodeToString(chunk);
 
-            String verifyHash = locationReport.getUsername() + locationReport.getWitnessTimeStamp() + locationReport.getWitness() + locationReport.getEpoch();
+            String verifyHash = locationReport.getUsername() + locationReport.getWitnessNonce() + locationReport.getWitness() + locationReport.getEpoch();
             byte[] messageByte1 = verifyHash.getBytes();
             MessageDigest digest1 = MessageDigest.getInstance("SHA-256");
             digest1.update(messageByte1);
@@ -1183,16 +1178,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 return "Error";
             }
 
-            //User Signature
-            /*FileInputStream fis2 = new FileInputStream("src/keys/" + locationReport.getUsername() + "Pub.key");
-            byte[] decoded2 = new byte[fis2.available()];
-            fis2.read(decoded2);
-            fis2.close();
-            X509EncodedKeySpec publicKeySpecUser = new X509EncodedKeySpec(decoded2);
-            KeyFactory keyFacPubUser = KeyFactory.getInstance("RSA");
-            PublicKey pubClient = keyFacPubUser.generatePublic(publicKeySpecUser);
-
-             */
             PublicKey pubClient = loadPublicKey(locationReport.getUsername());
 
             rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -1201,7 +1186,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             byte[] chunk2 = rsaCipher.doFinal(hashBytes2);
             String userSignature = Base64.getEncoder().encodeToString(chunk2);
 
-            verifyHash = locationReport.getUsername() + locationReport.getTimeStamp()  + locationReport.getEpoch() + locationReport.getPosX() + locationReport.getPosY();
+            verifyHash = locationReport.getUsername() + locationReport.getNonce()  + locationReport.getEpoch() + locationReport.getPosX() + locationReport.getPosY();
             byte[] messageByte2 = verifyHash.getBytes();
             MessageDigest digest2 = MessageDigest.getInstance("SHA-256");
             digest2.update(messageByte2);
@@ -1217,27 +1202,36 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 return "Error";
             }
 
-            //Get time
-            LocalTime clientTime = LocalTime.now();
-
-            try{
-                LocalTime witTime = LocalTime.parse(locationReport.getWitnessTimeStamp());
-                LocalTime userTime = LocalTime.parse(locationReport.getWitnessTimeStamp());
-
-                //4 segundos para possíveis atrasos na rede
-                LocalTime serverWitTimeThreshold = clientTime.plusSeconds(8);
-                LocalTime serverUserTimeThreshold = clientTime.plusSeconds(4);
-
-                if(serverWitTimeThreshold.compareTo(witTime) < 0 && serverUserTimeThreshold.compareTo(userTime) < 0){
-                    System.out.println("Possilble replay attack");
+            String username =  locationReport.getUsername();
+            String witnessUsername =  locationReport.getWitness();
+            try {
+                int userNonce = locationReport.getNonce();
+                if (!receiveNonce.containsKey(username)) {
+                    receiveNonce.put(username, userNonce);
+                }else if (receiveNonce.get(username) < userNonce) {
+                    receiveNonce.replace(username, userNonce);
+                } else {
+                    this.fileMan.appendInformation("\t\t\tPossilble replay attack");
                     return "Error";
                 }
+
+                /*int witnessNonce = locationReport.getWitnessNonce();
+                System.out.println("witness location nonce " + witnessNonce + " na hash " + receiveNonce.get(username));
+                if (!receiveNonce.containsKey(witnessUsername)) {
+                    receiveNonce.put(witnessUsername, witnessNonce);
+                }else if (receiveNonce.get(witnessUsername) < witnessNonce) {
+                    receiveNonce.replace(witnessUsername, witnessNonce);
+                } else {
+                    System.out.println("user -> server  witnessNonce" + witnessUsername + " map -> " + receiveNonce.get(witnessUsername) );
+                    System.out.println("heeey 2");
+                    this.fileMan.appendInformation("\t\t\tPossilble replay attack");
+                    return "Error";
+                }*/
             }
-            catch (DateTimeParseException e) {
+            catch (Exception e) {
                 System.out.println("Malformed report");
                 e.printStackTrace();
             }
-
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         } catch (BadPaddingException e) {
