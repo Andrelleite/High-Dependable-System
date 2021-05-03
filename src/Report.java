@@ -87,6 +87,10 @@ public class Report implements Serializable {
         this.Nonce = Nonce;
     }
 
+    public void setWitnessNonce(int witnessNonce) {
+        this.witnessNonce = witnessNonce;
+    }
+
     public void setEncryptedInfo(String encryptedInfo) {
         this.encryptedInfo = encryptedInfo;
     }

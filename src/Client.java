@@ -1,5 +1,3 @@
-import com.sun.security.jgss.GSSUtil;
-
 import javax.crypto.*;
 import javax.swing.plaf.synth.SynthOptionPaneUI;
 import java.io.*;
@@ -13,6 +11,8 @@ import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -64,6 +64,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     private List<String> clientsWithError = new ArrayList<String>();
     private OutputManager fileMan;
     private int gridNumber;
+    private int servers;
 
     public Map<Integer, Pair<Integer, Integer>> getMoveList() {
         return moveList;
@@ -141,14 +142,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         return username;
     }
 
-    public void setPassword(String password){
-        this.password = password;
-    }
-
-    public String getPassword(){
-        return password;
-    }
-
     public void setUsername(String username){
         this.username = username;
         this.fileMan = new OutputManager(this.username,this.username);
@@ -159,14 +152,23 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         }
         // REPORT SUBMISSION
         try{
-            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+
+            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
 
             SecretKey secretKey = KeyGenerator.getInstance("AES").generateKey();
             String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
             System.out.println("lado do client: " + encodedKey);
             this.setSymKey(secretKey);
 
-            PublicKey pub = loadPublicKey("server");
+            /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+            byte[] encoded2 = new byte[fis01.available()];
+            fis01.read(encoded2);
+            fis01.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);*/
+
+            PublicKey pub = loadPublicKey("server6");
 
             Cipher cipherRSA = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             cipherRSA.init(Cipher.ENCRYPT_MODE, pub);
@@ -218,9 +220,18 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         this.username = username;
     }
 
-    public Client(int grid) throws RemoteException {
+    public void setPassword(String password){
+        this.password = password;
+    }
+
+    public String getPassword(){
+        return password;
+    }
+
+    public Client(int grid, int servers) throws RemoteException {
         super();
         this.gridNumber = grid;
+        this.servers = servers;
     }
 
     public int getGridNumber(){
@@ -324,7 +335,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                 return null;
             }
 
-
             if(!receiveNonce.containsKey(username)){
                 receiveNonce.put(username, nonce);
             }else {
@@ -335,7 +345,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     return null;
                 }
             }
-
 
             int grid = getGridNumber();
             File myObj = new File("src/grid/grid"+grid+".txt");
@@ -371,7 +380,17 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                                 sendNonce.replace(usernameFile, nonceSend);
                             }
 
-                            String s = username + nonceSend + this.getUsername() + userEpoch;// this.getCoordinate1() + this.getCoordinate2();
+                            String s = username + nonceSend + this.getUsername() + userEpoch; //+ this.getCoordinate1() + this.getCoordinate2();
+
+                            //get witness private key
+                            /*FileInputStream fis0 = new FileInputStream("src/keys/" + this.getUsername() + "Priv.key");
+                            byte[] encoded1 = new byte[fis0.available()];
+                            fis0.read(encoded1);
+                            fis0.close();
+                            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+                            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+                            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+                             */
                             PrivateKey priv = loadPrivKey(this.getUsername());
 
                             //Hash message
@@ -471,7 +490,15 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
     public String verifyWitnessSignature(Report message, ClientInterface h) {
         try {
-
+            /*
+            FileInputStream fis1 = new FileInputStream("src/keys/" + message.getWitness() + "Pub.key");
+            byte[] decoded1 = new byte[fis1.available()];
+            fis1.read(decoded1);
+            fis1.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+             */
             PublicKey pub = loadPublicKey(message.getWitness());
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -480,8 +507,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             byte[] chunk = rsaCipher.doFinal(hashBytes1);
             String witSiganture = Base64.getEncoder().encodeToString(chunk);
 
-            String verifyHash = message.getUsername() + message.getWitnessNonce() + message.getWitness() + message.getEpoch(); // message.getPosXWitness() + message.getPosYWitness();
-
+            String verifyHash = message.getUsername() + message.getWitnessNonce() + message.getWitness() + message.getEpoch();
 
             byte[] messageByte1 = verifyHash.getBytes();
             MessageDigest digest1 = MessageDigest.getInstance("SHA-256");
@@ -517,7 +543,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
 
             PublicKey pub = loadPublicKey(user);
 
-            //String s01 =  nonce + user + epoch;
+            //String s01 =  time1 + user + epoch;
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, pub);
@@ -580,6 +606,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     }
 
                     String s01 =  nonceSend + this.getUsername() + this.getEpoch(); //+ this.getCoordinate1() + this.getCoordinate2();
+
                     PrivateKey priv1 = loadPrivKey(this.getUsername());
 
                     //Hash message
@@ -597,8 +624,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     String digitalSignature = Base64.getEncoder().encodeToString(finalHashBytes1);
 
 
-                    message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.getEpoch(),digitalSignature, nonceSend);
-
+                    message = h.generateLocationReportWitness(this.getClientInterface(),this.getUsername(), this.getEpoch(),digitalSignature,nonceSend);
                     if(message == null){
 
                         this.fileMan.appendInformation("\t\t\treport is null");
@@ -633,7 +659,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                         e.printStackTrace();
                     }
 
-
                     //TODO: mudar quando for mais que 1 server
                     int nonceServer = 1;
                     if(!sendNonce.containsKey("server")){
@@ -654,12 +679,27 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     byte[] digestByte0 = digest0.digest();
                     String digest64 = Base64.getEncoder().encodeToString(digestByte0);
 
+
                     //sign the hash with the client's private key
                     Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                     cipherHash.init(Cipher.ENCRYPT_MODE, priv);
                     byte[] hashBytes = Base64.getDecoder().decode(digest64);
                     byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+                    //encrypt the report's sensitive information
+
+                    //get server public key
+                    /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
+                    byte[] encoded2 = new byte[fis01.available()];
+                    fis01.read(encoded2);
+                    fis01.close();
+                    X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(encoded2);
+                    KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+                    PublicKey pub = keyFacPub.generatePublic(publicKeySpec);
+
+                    Cipher cipherReport = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                    cipherReport.init(Cipher.ENCRYPT_MODE, pub);*/
 
                     Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
                     cipherReport.init(Cipher.ENCRYPT_MODE, this.getSymKey());
@@ -683,9 +723,11 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     message.setNonce(nonceServer);
                     message.setUserSignature(signedHash);
 
+
                     // REPORT SUBMISSION
                     try{
-                        ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                        ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
+                        System.out.println("SERVER nr " + this.servers);
                         serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
                         this.fileMan.appendInformation("\t\tSERVER SIGNATURE:" + serverSignature);
                         System.out.println("SERVER SIGNATURE:" + serverSignature);
@@ -715,7 +757,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     }else if(serverSignature.equals("null")){
                         this.fileMan.appendInformation("\t\tSOMETHING WRONG HAPPENED, RETURN NOT SIGNED");
                     }else {
-
                         int nonceServerSign = Integer.parseInt((serverSignature.split(" ")[1]));
 
                         String signServerHash = serverSignature.split(" ")[4];
@@ -753,13 +794,20 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         else{
             this.fileMan.appendInformation("\t\t"+this.getUsername() + " DOESN'T HAVE ANY USERS NEARBY. IT'S SAD, BUT YOU ARE ALONE.");
         }
-
     }
 
     private String verifyServerSign(String serverHash, String userToHash) {
 
         try {
-            PublicKey pub = loadPublicKey("server");
+            /*FileInputStream fis1 = new FileInputStream("src/keys/serverPub.key");
+            byte[] decoded1 = new byte[fis1.available()];
+            fis1.read(decoded1);
+            fis1.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(decoded1);
+            KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
+            PublicKey pub = keyFacPub.generatePublic(publicKeySpec);*/
+
+            PublicKey pub = loadPublicKey("server6");
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, pub);
@@ -790,7 +838,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
     public void getReports(String ep) throws RemoteException{
 
         try {
-            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+            ServerInterface s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
 
             //get server public key
             /*FileInputStream fis01 = new FileInputStream("src/keys/serverPub.key");
@@ -829,6 +877,17 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                 this.fileMan.appendInformation(" [REQUEST TO SERVER]  DENIED");
                 return;
             }
+
+            /*FileInputStream fis0 = new FileInputStream("src/keys/"+this.getUsername()+"Priv.key");
+            byte[] encoded1 = new byte[fis0.available()];
+            fis0.read(encoded1);
+            fis0.close();
+            PKCS8EncodedKeySpec privSpec = new PKCS8EncodedKeySpec(encoded1);
+            KeyFactory keyFacPriv = KeyFactory.getInstance("RSA");
+            PrivateKey priv = keyFacPriv.generatePrivate(privSpec);
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, priv);*/
 
             Cipher rsaCipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, this.getSymKey());
@@ -928,7 +987,8 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         Thread thread = new Thread(this);
         thread.start();
         thread.join();
-        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
+        System.out.println("retry???");
         serverSignature = s.submitLocationReport(this.getClientInterface(),this.getUsername(),message);
         return serverSignature;
     }
@@ -938,7 +998,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         Thread thread = new Thread(this);
         thread.start();
         thread.join();
-        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+        s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
         s.subscribe(this.getClientInterface(),this.getUsername(), this.getKey());
     }
 
@@ -950,7 +1010,7 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
             System.out.println("New try.");
             try {
                 Thread.sleep(2000);
-                s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                s = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+(this.servers));
             } catch (InterruptedException e) {
                 /*exit*/
             } catch (RemoteException | MalformedURLException | NotBoundException e){

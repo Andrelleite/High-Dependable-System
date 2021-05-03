@@ -24,6 +24,7 @@ public class HAClient extends Thread{
     private IdentityHashMap<Integer,Integer> identity;
     private SecretKey symKey;
     private OutputManager fileMan;
+    private int servers;
 
     public void setSymKey(SecretKey symKey) {
         this.symKey = symKey;
@@ -33,10 +34,11 @@ public class HAClient extends Thread{
         return symKey;
     }
 
-    public HAClient() throws IOException, NotBoundException, ClassNotFoundException, NotBoundException, IOException, ClassNotFoundException{
+    public HAClient(int servers) throws IOException, NotBoundException, ClassNotFoundException, NotBoundException, IOException, ClassNotFoundException{
         super();
         this.fileMan = new OutputManager("HA","Health Authority");
         this.fileMan.initFile();
+        this.servers = servers;
     }
 
     private PublicKey loadPublicKey (String keyName) {
@@ -72,7 +74,7 @@ public class HAClient extends Thread{
     public void handshake(){
         try {
             try {
-                this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+this.servers);
 
                 SecretKey secretKey = KeyGenerator.getInstance("AES").generateKey();
                 String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
@@ -86,7 +88,7 @@ public class HAClient extends Thread{
                 KeyFactory keyFacPub = KeyFactory.getInstance("RSA");
                 PublicKey pub = keyFacPub.generatePublic(publicKeySpec);*/
 
-                PublicKey pub = loadPublicKey("server");
+                PublicKey pub = loadPublicKey("server6");
 
                 Cipher cipherRSA = Cipher.getInstance("RSA/ECB/PKCS1Padding");
                 cipherRSA.init(Cipher.ENCRYPT_MODE, pub);
@@ -283,7 +285,7 @@ public class HAClient extends Thread{
             this.fileMan.appendInformation("New try.");
             try {
                 Thread.sleep(2000);
-                this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER");
+                this.h = (ServerInterface) Naming.lookup("rmi://127.0.0.1:7000/SERVER"+this.servers);
             } catch (InterruptedException e) {
                 /*exit*/
             } catch (RemoteException | MalformedURLException | NotBoundException e){
@@ -300,7 +302,7 @@ public class HAClient extends Thread{
     //====================================MAIN==========================================================================
 
     public static void main(String[] args) throws NotBoundException, IOException, ClassNotFoundException {
-        HAClient ha = new HAClient();
+        HAClient ha = new HAClient(6);
         //ha.handshake(1,"","30","37","0");
         //ha.handshake(1,"","30","37","0");
     }
