@@ -62,7 +62,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         this.fileMan.initFile();
         synchronize(); // Updates the reports in list to the latest in file
         this.server = retryConnection(7000);
-
         if (!imPrimary) {
             checkPrimaryServer(this.server);
         }
@@ -106,7 +105,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             String url = "rmi://127.0.0.1:7000/SERVER"+this.id;
             System.out.println(url);
             Naming.rebind(url, server);
-            serverInt = (ServerInterface) Naming.lookup("rmi://"+this.IPV4+":" + port + "/SERVER"+this.id);
+            serverInt = (ServerInterface) Naming.lookup(url);
             imPrimary = true;
         } catch (ExportException | NotBoundException ex) {
             imPrimary = false;
@@ -226,6 +225,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     public ServerInterface getInterface(){
         return this.server;
     }
+
 
     //=======================USER-METHODS===============================================================================
 
