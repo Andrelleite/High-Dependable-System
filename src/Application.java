@@ -42,21 +42,21 @@ class Simulation{
 
         N = cardinal.strip().split(",")[1];
         int n = Integer.parseInt(cardinal.strip().split(",")[1]);
+        LocateRegistry.createRegistry(7000);
 
         for(int i = 0; i < n; i++){
             try {
                 System.out.println("Starting server replica number "+(i+1));
                 this.servers.add(new Server(this.f,this.fline,(i+1),n));
-                this.servers.get(i).setPassword("server" + (i+1));
             }  catch (NotBoundException | IOException | ClassNotFoundException e) {
                 System.out.println("SHIT.");
             }
         }
 
         for(int i = 0; i < n; i++){
-            this.servers.get(i).connectToNetwork();
+            this.servers.get(i).connectToNetwork(this.servers.get(i).getInterface());
         }
-
+        
     }
 
     private void startClients(){
