@@ -13,21 +13,25 @@ public class Report implements Serializable {
     private String encryptedInfo;
     private int Nonce;
     private int witnessNonce;
+    private String timeStamp;
+    private String witnessTimeStamp;
     private String witnessPos;
     private int posXWitness;
     private int posYWitness;
 
-    public Report(ClientInterface cl, int x, int y, int ep, String user, String userSignature, int Nonce, String witness, String witnessSignature, int witnessNonce, String witnessPos) {
+    public Report(ClientInterface cl, int x, int y, int ep, String user, String userSignature, int Nonce, String timeStamp, String witness, String witnessSignature, int witnessNonce,String witnessTimeStamp , String witnessPos) {
         this.c = cl;
         this.posX = x;
         this.posY = y;
         this.epoch = ep;
         this.username = user;
         this.userSignature = userSignature;
+        this.timeStamp = timeStamp;
         this.Nonce = Nonce;
         this.witness = witness;
         this.witnessSignature = witnessSignature;
         this.witnessNonce = witnessNonce;
+        this.witnessTimeStamp = witnessTimeStamp;
         this.witnessPos = witnessPos;
     }
 
@@ -87,8 +91,16 @@ public class Report implements Serializable {
         this.Nonce = Nonce;
     }
 
-    public void setWitnessNonce(int witnessNonce) {
-        this.witnessNonce = witnessNonce;
+    public String getTimeStamp() {
+        return timeStamp;
+    }
+
+    public void setTimeStamp(String timeStamp) {
+        this.timeStamp = timeStamp;
+    }
+
+    public String getWitnessTimeStamp() {
+        return witnessTimeStamp;
     }
 
     public void setEncryptedInfo(String encryptedInfo) {
