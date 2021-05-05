@@ -4,6 +4,7 @@ public class Report implements Serializable {
 
     private ClientInterface c;
     private String username;
+    private long serverId;
     private String userSignature;
     private String witness;
     private String witnessSignature;
@@ -19,7 +20,7 @@ public class Report implements Serializable {
     private int posXWitness;
     private int posYWitness;
 
-    public Report(ClientInterface cl, int x, int y, int ep, String user, String userSignature, int Nonce, String timeStamp, String witness, String witnessSignature, int witnessNonce,String witnessTimeStamp , String witnessPos) {
+    public Report(ClientInterface cl, int x, int y, int ep, String user, String userSignature, int Nonce, String timeStamp, String witness, String witnessSignature, int witnessNonce,String witnessTimeStamp , String witnessPos, long serverId) {
         this.c = cl;
         this.posX = x;
         this.posY = y;
@@ -33,6 +34,7 @@ public class Report implements Serializable {
         this.witnessNonce = witnessNonce;
         this.witnessTimeStamp = witnessTimeStamp;
         this.witnessPos = witnessPos;
+        this.serverId = serverId;
     }
 
     public ClientInterface getC() {
@@ -49,6 +51,10 @@ public class Report implements Serializable {
 
     public int getEpoch() {
         return this.epoch;
+    }
+
+    public long getServerId() {
+        return this.serverId;
     }
 
     public String getUsername() {

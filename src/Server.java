@@ -245,8 +245,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private PrivateKey loadPrivKey (String keyName) {
         try {
-            System.out.println("keyName " + keyName);
-            System.out.println("pass " + getPassword());
             KeyStore keyStore = KeyStore.getInstance("JKS");
             InputStream readStream = new FileInputStream("src/keys/" + keyName +".keystore");
             keyStore.load(readStream, (getPassword() + "key").toCharArray());
@@ -312,7 +310,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                     Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
                     cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
-
 
                     byte[] hashBytes1 = java.util.Base64.getDecoder().decode(locationReport.getEncryptedInfo());
                     byte[] chunk = cipher.doFinal(hashBytes1);
@@ -496,7 +493,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                 if(flag==0){
                     if(ep[0] !=-1){
-                        reports = fetchReports(c, ep[0]);
+                        reports = fetchReports(c, ep[0], id);
                     }
 
                     int nonceSend = 1;
@@ -542,7 +539,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                                 byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
                                 String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
 
-                                Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos());
+                                Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos(), id);
                                 n.setEncryptedInfo(loc);
 
                                 returnReport.add(n);
@@ -703,7 +700,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
                         String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
 
-                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos());
+                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos(), id);
                         n.setEncryptedInfo(loc);
 
                         returnReport.add(n);
@@ -857,7 +854,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
                         String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
 
-                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos());
+                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos(), id);
                         n.setEncryptedInfo(loc);
 
                         returnReport.add(n);
@@ -1126,7 +1123,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         oos.close();
     }
 
-    private ArrayList<Report> fetchReports(ClientInterface c, int epoch){
+    private ArrayList<Report> fetchReports(ClientInterface c, int epoch, long serverId){
 
         //String user = c.getUserId();
         ArrayList<Report> clientReports = (ArrayList<Report>) this.reps.clone();
@@ -1136,6 +1133,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 clientReports.remove(i);
                 i--;
             }else if(clientReports.get(i).getEpoch() != epoch){
+                clientReports.remove(i);
+                i--;
+            }else if(clientReports.get(i).getServerId() != serverId){
                 clientReports.remove(i);
                 i--;
             }

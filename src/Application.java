@@ -48,6 +48,7 @@ class Simulation{
             try {
                 System.out.println("Starting server replica number "+(i+1));
                 this.servers.add(new Server(this.f,this.fline,(i+1),n));
+                this.servers.get(i).setPassword("server" + (i+1));
             }  catch (NotBoundException | IOException | ClassNotFoundException e) {
                 System.out.println("SHIT.");
             }
