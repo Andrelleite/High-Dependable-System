@@ -18,8 +18,8 @@ import java.util.Iterator;
 
 public class Byzantine extends Client{
 
-    public Byzantine(int grid, int servers) throws RemoteException {
-        super(grid,servers);
+    public Byzantine(int grid, int servers, int f) throws RemoteException {
+        super(grid,servers,f);
     }
 
 }
