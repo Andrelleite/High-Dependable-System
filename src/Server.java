@@ -139,10 +139,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================SERVER-SYS=================================================================================
 
-    public void HASubscribe(String key) throws RemoteException{
+    public void HASubscribe(String key, String user) throws RemoteException{
 
         try {
-
             PrivateKey priv = loadPrivKey("server" + id);
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -154,8 +153,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
 
             String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
-            this.symKey.put("ha",originalKey);
-            StoreKeysToKeyStore(originalKey, "ha","KeyStore","src/keys/aes-ha.keystore");
+            this.symKey.put(user,originalKey);
+            StoreKeysToKeyStore(originalKey, user,"KeyStore","src/keys/aes-" + user +".keystore");
 
 
         }  catch (NoSuchAlgorithmException e) {
@@ -773,7 +772,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     //=======================AUTHORITY-METHODS==========================================================================
 
-    public synchronized  ServerReturn obtainLocationReport(String user, String epoch, int rid, String signedHashPOW, int hashInt) throws InterruptedException {
+    public synchronized  ServerReturn obtainLocationReport(String user, String epoch, int rid, String signedHashPOW, int hashInt, String userId) throws InterruptedException {
 
         int[] ep = {-1};
         ServerReturn[] serverReturn = new ServerReturn[1];
@@ -791,11 +790,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 String finalS = "";
                 ArrayList<Report> returnReport = new ArrayList<>();
 
-                if(verifyProofOfWork(signedHashPOW, hashInt, rid).equals("Correct")) {
+                if(verifyProofOfWork(signedHashPOW, hashInt, rid, userId).equals("Correct")) {
                     try {
                         Cipher cipher = null;
                         cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                        cipher.init(Cipher.DECRYPT_MODE, symKey.get("ha"));
+                        cipher.init(Cipher.DECRYPT_MODE, symKey.get(userId));
 
                         byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
                         byte[] chunk2 = cipher.doFinal(hashBytes3);
@@ -840,7 +839,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                     String time = java.time.LocalTime.now().toString();
 
-                    String s1 = "ha" + userFinal + nonceSend + time + epochFinal;
+                    String s1 = userId + userFinal + nonceSend + time + epochFinal;
 
                     //String finalS = "";
                     //ArrayList<Report> returnReport = new ArrayList<>();
@@ -848,7 +847,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     try {
 
                         Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                        cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("ha"));
+                        cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(userId));
 
                         Iterator i = clientReports.iterator();
                         while (i.hasNext()) {
@@ -923,7 +922,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn[0];
     }
 
-    public synchronized  ServerReturn obtainUsersAtLocation(String pos, String epoch, int rid, String signedHashPOW, int hashInt) throws InterruptedException{
+    public synchronized  ServerReturn obtainUsersAtLocation(String pos, String epoch, int rid, String signedHashPOW, int hashInt, String userId) throws InterruptedException{
 
         int[] ep = {-1};
         int[] posi = {-1, -1};
@@ -940,14 +939,14 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 String finalS = "";
                 ArrayList<Report> returnReport = new ArrayList<>();
 
-                if(verifyProofOfWork(signedHashPOW, hashInt, rid).equals("Correct")) {
+                if(verifyProofOfWork(signedHashPOW, hashInt, rid, userId).equals("Correct")) {
 
                     try {
                         Cipher cipher = null;
                         cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 
 
-                        cipher.init(Cipher.DECRYPT_MODE, symKey.get("ha"));
+                        cipher.init(Cipher.DECRYPT_MODE, symKey.get(userId));
 
                         byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
                         byte[] chunk2 = cipher.doFinal(hashBytes3);
@@ -991,17 +990,17 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
 
                     int nonceSend = 1;
-                    if (!sendNonce.containsKey("ha")) {
-                        sendNonce.put("ha", nonceSend);
+                    if (!sendNonce.containsKey(userId)) {
+                        sendNonce.put(userId, nonceSend);
                     } else {
-                        nonceSend = sendNonce.get("ha");
+                        nonceSend = sendNonce.get(userId);
                         nonceSend += 1;
-                        sendNonce.replace("ha", nonceSend);
+                        sendNonce.replace(userId, nonceSend);
                     }
 
                     String time = java.time.LocalTime.now().toString();
 
-                    String s1 = "ha" + posi[0] + posi[1] + nonceSend + time + ep[0];
+                    String s1 = userId + posi[0] + posi[1] + nonceSend + time + ep[0];
 
                     //String finalS = "";
                     //ArrayList<Report> returnReport = new ArrayList<>();
@@ -1009,7 +1008,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     try {
 
                         Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                        cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("ha"));
+                        cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(userId));
 
                         Iterator i = clientReports.iterator();
                         while (i.hasNext()) {
@@ -1526,12 +1525,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
     }
 
-    private String verifyProofOfWork(String signedHashPOW, int hashInt, int rid) {
+    private String verifyProofOfWork(String signedHashPOW, int hashInt, int rid, String userId) {
 
             //TODO: mudar para minimo 4 zeros
         try {
 
-            PublicKey pub = loadPublicKey("hauser");
+            PublicKey pub = loadPublicKey(userId);
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, pub);

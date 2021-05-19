@@ -32,6 +32,7 @@ public class HAClient extends Thread{
     private AtomicInteger writerTimeStamp;
     private String val;
     private String signature;
+    private String userid;
 
     public void setSymKey(SecretKey symKey) {
         this.symKey = symKey;
@@ -41,14 +42,16 @@ public class HAClient extends Thread{
         return symKey;
     }
 
-    public HAClient(int servers, int f) throws IOException, NotBoundException, ClassNotFoundException, NotBoundException, IOException, ClassNotFoundException{
+    public HAClient(int servers, int f, int id) throws IOException, NotBoundException, ClassNotFoundException, NotBoundException, IOException, ClassNotFoundException{
         super();
         this.fileMan = new OutputManager("HA","Health Authority");
         this.networkTosymKey = new HashMap<>();
         this.fileMan.initFile();
         this.F = f;
         this.servers = servers;
+        this.userid = "hauser"+id;
         bonrrInit();
+
     }
 
     private PublicKey loadPublicKey (String keyName) {
@@ -99,7 +102,7 @@ public class HAClient extends Thread{
                     byte[] cipherBytes = cipherRSA.doFinal(keyBytes);
                     String encryptedKey = Base64.getEncoder().encodeToString(cipherBytes);
 
-                    h.HASubscribe(encryptedKey);
+                    h.HASubscribe(encryptedKey, this.userid);
                     this.networkTosymKey.put(h,secretKey);
                 }
             }catch (RemoteException | MalformedURLException | NotBoundException e){
@@ -155,7 +158,7 @@ public class HAClient extends Thread{
                     while(!hashPOW.startsWith("0"));
                     //TODO: mudar para min 4 zeros
 
-                    PrivateKey priv = loadPrivKey("hauser");
+                    PrivateKey priv = loadPrivKey(this.userid);
 
                     //sign the hash with the ha private key
                     Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -165,7 +168,7 @@ public class HAClient extends Thread{
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
 
-                    ServerReturn r = s.obtainUsersAtLocation(locationEnc,epochEnc,this.requestId.get(), signedHash, hashInt);
+                    ServerReturn r = s.obtainUsersAtLocation(locationEnc,epochEnc,this.requestId.get(), signedHash, hashInt, this.userid);
                     reports = r.getReports();
                     if(this.requestId.get() == r.getRid()){
                         if(verifiySignature(r.getReports(),s)==1) {
@@ -280,7 +283,7 @@ public class HAClient extends Thread{
                     while(!hashPOW.startsWith("0"));
                     //TODO: mudar para min 4 zeros
 
-                    PrivateKey priv = loadPrivKey("hauser");
+                    PrivateKey priv = loadPrivKey(this.userid);
 
                     //sign the hash with the ha private key
                     Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
@@ -289,7 +292,7 @@ public class HAClient extends Thread{
                     byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
                     String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
-                    ServerReturn r = s.obtainLocationReport(userEnc,epochEnc,this.requestId.get(), signedHash, hashInt);
+                    ServerReturn r = s.obtainLocationReport(userEnc,epochEnc,this.requestId.get(), signedHash, hashInt, this.userid);
                     reports = r.getReports();
 
                     if(this.requestId.get() == r.getRid()){
@@ -526,7 +529,7 @@ public class HAClient extends Thread{
     //====================================MAIN==========================================================================
 
     public static void main(String[] args) throws NotBoundException, IOException, ClassNotFoundException {
-        HAClient ha = new HAClient(6,2);
+        HAClient ha = new HAClient(6,2, 1); //TODO: HARDCODED -> ADICIONEI UM 1
         //ha.handshake(1,"","30","37","0");
         //ha.handshake(1,"","30","37","0");
     }

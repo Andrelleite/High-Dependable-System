@@ -363,7 +363,7 @@ class Simulation{
                 this.u = setValue(line);
             }else if(lineCounter == 3){
                 this.ha = setValue(line);
-                HAClient ha = new HAClient(Integer.parseInt(this.N),this.f);
+                HAClient ha = new HAClient(Integer.parseInt(this.N),this.f, 1);//TODO: HARDCODED -> ADICIONEI UM 1
                 this.authorities.add(ha);
                 this.authorities.get(0).handshake();
             }else if(lineCounter < this.f+3){
