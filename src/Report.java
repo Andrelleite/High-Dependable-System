@@ -6,6 +6,7 @@ public class Report implements Serializable {
     private String username;
     private long serverId;
     private String userSignature;
+    private int intPOW;
     private String witness;
     private String witnessSignature;
     private int posX;
@@ -149,4 +150,13 @@ public class Report implements Serializable {
         return witnessPos;
     }
 
+    public void setServerId(int id){ this.serverId = id; }
+
+    public int getIntPOW() {
+        return intPOW;
+    }
+
+    public void setIntPOW(int intPOW) {
+        this.intPOW = intPOW;
+    }
 }

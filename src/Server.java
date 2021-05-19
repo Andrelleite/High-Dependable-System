@@ -20,10 +20,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private static final long serialVersionUID = 1L;
     public static int GRIDDIMENISION = 40;
-    public  ConcurrentHashMap<String,SecretKey> symKey;
+    public ConcurrentHashMap<String,SecretKey> symKey;
     private ConcurrentHashMap<String,Double> allSystemUsers; // User and the certainty of byzantine behaviour
-    public  ConcurrentHashMap<String,Integer> sendNonce = new ConcurrentHashMap<String, Integer>();
-    public  ConcurrentHashMap<String,Integer> receiveNonce= new ConcurrentHashMap<String, Integer>();
+    public ConcurrentHashMap<String,Integer> sendNonce = new ConcurrentHashMap<String, Integer>();
+    public ConcurrentHashMap<String,Integer> receiveNonce = new ConcurrentHashMap<String, Integer>();
+    public ConcurrentHashMap<ClientInterface,Integer> writerTimestamps;
+    public ConcurrentHashMap<ClientInterface,Integer> requestLoadBalancer;
     private ArrayList<Report> reps; // Structure of all reports in the system
     private ArrayList<ServerInterface> replicas;
     private ServerInterface server;
@@ -57,6 +59,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         this.IPV4 = "127.0.0.1";
         this.portRMI = 7000;
         this.symKey = new ConcurrentHashMap<>();
+        this.writerTimestamps = new ConcurrentHashMap<>();
+        this.requestLoadBalancer = new ConcurrentHashMap<>();
         this.replicas = new ArrayList<>();
         this.fileMan = new OutputManager("Server"+this.id,"Server"+this.id);
         this.fileMan.initFile();
@@ -178,9 +182,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         this.allSystemUsers.put(user,0.0);
         try {
             updateUsers();
-
             PrivateKey priv = loadPrivKey("server" + id);
-
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, priv);
             byte[] hashBytes = java.util.Base64.getDecoder().decode(key);
@@ -192,10 +194,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             String encodedKey = Base64.getEncoder().encodeToString(originalKey.getEncoded());
 
             this.symKey.put(user,originalKey);
-
+            this.writerTimestamps.put(c,0);
+            this.requestLoadBalancer.put(c,0);
             StoreKeysToKeyStore(originalKey, user,"KeyStore","src/keys/aes-" + user +".keystore");
-
-
 
             //this.setSymKey(originalKey);
         } catch (IOException e) {
@@ -226,8 +227,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return this.server;
     }
 
-
-    //=======================USER-METHODS===============================================================================
+    //=======================CONTROL-METHODS===============================================================================
 
     private PublicKey loadPublicKey (String keyName) {
         try {
@@ -294,9 +294,12 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return null;
     }
 
-    public synchronized String submitLocationReport(ClientInterface c,String user, Report locationReport) throws RemoteException, InterruptedException {
+    //=======================USER-METHODS===============================================================================
 
-        String[] serverReturn = new String[1];
+    public synchronized String submitLocationReport(ClientInterface c,String user, Report locationReport, int wts, String signWts) throws RemoteException, InterruptedException {
+
+        String[] serverReturn = {""};
+        Integer[] userTimestamp = {this.writerTimestamps.get(c)};
         ArrayList<Report> reps = this.reps;
         ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
@@ -311,36 +314,41 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
                     cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
 
-                    byte[] hashBytes1 = java.util.Base64.getDecoder().decode(locationReport.getEncryptedInfo());
-                    byte[] chunk = cipher.doFinal(hashBytes1);
-                    String info = new String(chunk, UTF_8);
+                    if(verifyProofOfWork(locationReport).equals("Correct")){
 
-                    locationReport.setPosX(Integer.parseInt(info.split("w")[0].split("q")[1]));
-                    locationReport.setPosY(Integer.parseInt(info.split("w")[1].split("q")[1]));
-                    locationReport.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
+                        byte[] hashBytes1 = java.util.Base64.getDecoder().decode(locationReport.getEncryptedInfo());
+                        byte[] chunk = cipher.doFinal(hashBytes1);
+                        String info = new String(chunk, UTF_8);
 
-                    byte[] hashBytes3 = java.util.Base64.getDecoder().decode(locationReport.getWitness());
-                    byte[] chunk2 = cipher.doFinal(hashBytes3);
-                    String witness =  new String(chunk2, UTF_8);
+                        locationReport.setPosX(Integer.parseInt(info.split("w")[0].split("q")[1]));
+                        locationReport.setPosY(Integer.parseInt(info.split("w")[1].split("q")[1]));
+                        locationReport.setEpoch(Integer.parseInt(info.split("w")[2].split("q")[1]));
 
-                    locationReport.setWitness(witness);
+                        byte[] hashBytes3 = java.util.Base64.getDecoder().decode(locationReport.getWitness());
+                        byte[] chunk2 = cipher.doFinal(hashBytes3);
+                        String witness =  new String(chunk2, UTF_8);
 
-                    if(witness.equals(user)){
+                        locationReport.setWitness(witness);
+
+                        if(witness.equals(user)){
+                            serverReturn[0] = "null";
+                            filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! WITNESS EQUALS USER");
+                        }
+
+                        if(serverReturn[0] != "null"){
+                            Cipher cipherWit = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                            cipherWit.init(Cipher.DECRYPT_MODE, symKey.get(witness));
+
+                            byte[] hashBytes2 = java.util.Base64.getDecoder().decode(locationReport.getWitnessPos());
+                            byte[] chunkWit = cipherWit.doFinal(hashBytes2);
+                            String info2 = new String(chunkWit, UTF_8);
+
+                            locationReport.setPosXWitness(Integer.parseInt(info2.split("w")[0].split("q")[1]));
+                            locationReport.setPosYWitness(Integer.parseInt(info2.split("w")[1].split("q")[1]));
+                        }
+                    }else{
+                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! PROOF OF WORK NOT ACCEPTED");
                         serverReturn[0] = "null";
-                        filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! WITNESS EQUALS USER");
-                    }
-
-
-                    if(serverReturn[0] != "null"){
-                        Cipher cipherWit = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                        cipherWit.init(Cipher.DECRYPT_MODE, symKey.get(witness));
-
-                        byte[] hashBytes2 = java.util.Base64.getDecoder().decode(locationReport.getWitnessPos());
-                        byte[] chunkWit = cipherWit.doFinal(hashBytes2);
-                        String info2 = new String(chunkWit, UTF_8);
-
-                        locationReport.setPosXWitness(Integer.parseInt(info2.split("w")[0].split("q")[1]));
-                        locationReport.setPosYWitness(Integer.parseInt(info2.split("w")[1].split("q")[1]));
                     }
 
                 }
@@ -364,8 +372,11 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 if(serverReturn[0] != "null"){
                     filer.appendInformation("[PROOF REQUEST] "+user+" SUBMITING NEW LOCATION PROOF AT EPOCH "+locationReport.getEpoch()+" ===== ");
 
-                    String verifyRet = verifyLocationReport(c, user, locationReport);
-                    if(verifyRet.equals("Correct") /* && !checkClone(locationReport) */){
+                    String verifyRet = verifyLocationReport(c, user, locationReport, signWts, wts);
+                    if(verifyRet.equals("Correct") && wts > userTimestamp[0] && !checkClone(locationReport)){ // ts' > ts
+
+                        userTimestamp[0]=wts;
+
                         filer.appendInformation("\t\t\tRECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
                         filer.appendInformation("\t\t\tUSER SIGNATURE: " + locationReport.getUserSignature());
                         filer.appendInformation("\t\t\tNONCE: " + locationReport.getNonce());
@@ -394,8 +405,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                             String time = java.time.LocalTime.now().toString();
 
                             String s1 = user + nonceSend + time + locationReport.getEpoch();
-
-
                             PrivateKey priv = loadPrivKey("server" + id);
 
                             //Hash message
@@ -433,20 +442,22 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     serverReturn[0] = "null";
             }
         };
+
         worker.start();
         worker.join();
         this.symKey = symKey;
         this.reps = reps;
-        return serverReturn[0];
+        return serverReturn[0]+","+userTimestamp[0];
     }
 
-    public synchronized ServerReturn obtainLocationReport(ClientInterface c, String epoch, String username) throws IOException, ClassNotFoundException, InterruptedException {
+    public synchronized ServerReturn obtainLocationReport(ClientInterface c, String epoch, String username, int rid, String signedHashPOW, int hashInt) throws IOException, ClassNotFoundException, InterruptedException {
 
         int[] ep = {-1};
         ServerReturn[] serverReturn = new ServerReturn[1];
         ArrayList<Report> reps = this.reps;
         ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
+        this.requestLoadBalancer.put(c,this.requestLoadBalancer.get(c)+1);
 
         Thread worker = new Thread("Worker") {
             @Override
@@ -456,14 +467,18 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 filer.appendInformation("[REPORT REQUEST] NEW REPORT DELIVERY REQUEST =====");
                 try{
 
-                    Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipher.init(Cipher.DECRYPT_MODE, symKey.get(username));
+                    if(verifyProofOfWork(signedHashPOW, username, hashInt, rid).equals("Error")){
+                        flag = 1;
+                    }else {
+                        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                        cipher.init(Cipher.DECRYPT_MODE, symKey.get(username));
 
-                    byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
-                    byte[] chunk2 = cipher.doFinal(hashBytes3);
-                    String parse =  new String(chunk2, UTF_8);
+                        byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
+                        byte[] chunk2 = cipher.doFinal(hashBytes3);
+                        String parse = new String(chunk2, UTF_8);
 
-                    ep[0] = Integer.parseInt(parse);
+                        ep[0] = Integer.parseInt(parse);
+                    }
 
                 }
                 catch (NoSuchAlgorithmException e) {
@@ -508,7 +523,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     String time = java.time.LocalTime.now().toString();
 
                     String s1 = username + nonceSend + time + ep[0];
-
                     String finalS = "";
 
                     ArrayList<Report> returnReport = new ArrayList<>();
@@ -523,14 +537,14 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                             while (i.hasNext()) {
                                 Report r = (Report) i.next();
 
-                                String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
-
+                                String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch()+"pp";
+                                System.out.println("SERVER================================= "+info);
                                 //r.setEpoch(-1);
                                 //r.setPosX(-1);
                                 //r.setPosY(-1);
 
-                                byte[] infoBytes = Base64.getDecoder().decode(info);
-                                byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                                //byte[] infoBytes = Base64.getDecoder().decode(info);
+                                byte[] cipherBytes1 = cipherReport.doFinal(info.getBytes());
                                 String loc = Base64.getEncoder().encodeToString(cipherBytes1);
 
                                 //r.setEncryptedInfo(loc);
@@ -541,6 +555,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
                                 Report n = new Report(null,-1,-1,-1,username,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos(), id);
                                 n.setEncryptedInfo(loc);
+                                n.setIntPOW(r.getIntPOW());
 
                                 returnReport.add(n);
 
@@ -582,27 +597,183 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         filer.appendInformation("\t\t !REQUEST FOR REPORT DELIVERY DROPPED! CODE#SOLR10");
                     }
 
-                    serverReturn[0] = new ServerReturn(finalS,returnReport);
+                    serverReturn[0] = new ServerReturn(finalS,returnReport,rid);
                     filer.appendInformation("\t\t\t REQUEST COMPLETE FOR "+username);
                 }
 
                 else{
-                    serverReturn[0] = new ServerReturn(null,null);
+                    serverReturn[0] = new ServerReturn(null,null,0);
                 }
 
 
 
             }
         };
+        //this.requestLoadBalancer.put(c,this.requestLoadBalancer.get(c)-1);
+        filer.appendInformation("\n\t\t\tLOAD DISTRIBUTION: ");
+        for (ClientInterface cl: this.requestLoadBalancer.keySet()){
+            filer.appendInformation("\t\t\t"+cl.getUsername()+" requests on progress: "+this.requestLoadBalancer.get(cl));
+        }
+        filer.appendInformation("\n");
         worker.start();
         worker.join();
         return serverReturn[0];
 
     }
 
+    public ServerReturn requestMyProofs(ClientInterface c, String user, String ei, String ef, int rid, String signedHashPOW, int hashInt) throws RemoteException, InterruptedException {
+
+        int[] ep = {-1,-1};
+        ServerReturn[] serverReturn = new ServerReturn[1];
+        ArrayList<Report> reps = (ArrayList<Report>) this.reps.clone();
+        ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
+        OutputManager filer = this.fileMan;
+
+        Thread worker = new Thread("Worker"){
+            @Override
+            public void run(){
+
+                int epochFinal = -1;
+                int epochInitial = -1;
+
+                String finalS = "";
+                ArrayList<Report> returnReport = new ArrayList<>();
+
+                if (verifyProofOfWork(signedHashPOW, user, hashInt, rid).equals("Correct")) {
+                    try {
+                        Cipher cipher = null;
+                        cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                        cipher.init(Cipher.DECRYPT_MODE, symKey.get(user));
+
+                        byte[] hashBytes3 = java.util.Base64.getDecoder().decode(ei);
+                        byte[] chunk2 = cipher.doFinal(hashBytes3);
+                        String parse = new String(chunk2, UTF_8);
+
+                        byte[] hashBytes4 = java.util.Base64.getDecoder().decode(ef);
+                        byte[] chunk4 = cipher.doFinal(hashBytes4);
+                        String parse2 = new String(chunk4, UTF_8);
+
+                        ep[0] = Integer.parseInt(parse);
+                        ep[1] = Integer.parseInt(parse2);
+                        epochInitial = ep[0];
+                        epochFinal = ep[1];
+
+                    } catch
+                    (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException
+                    e){
+                        e.printStackTrace();
+                    }
+
+                    filer.appendInformation("\n");
+                    filer.appendInformation("REQUESTING WITNESS " + user + " LOCATION REPORTS BETWEEN EPOCH " + epochInitial + " and " + epochFinal);
+
+                    ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
+                    for (int i = 0; i < clientReports.size(); i++) {
+                        if (!clientReports.get(i).getWitness().equals(user)) {
+                            clientReports.remove(i);
+                            i--;
+                        } else if (clientReports.get(i).getEpoch() < ep[0] || clientReports.get(i).getEpoch() > ep[1]) {
+                            clientReports.remove(i);
+                            i--;
+                        }
+                    }
+                    cleanRepetition(clientReports, 1);
+                    filer.appendInformation("\t\t\tREQUEST SIZE :" + clientReports.size());
+                    filer.appendInformation("\t\t\tREQUEST COMPLETE");
+
+                    int nonceSend = 1;
+                    if (!sendNonce.containsKey(user)) {
+                        sendNonce.put(user, nonceSend);
+                    } else {
+                        nonceSend = sendNonce.get(user);
+                        nonceSend += 1;
+                        sendNonce.replace(user, nonceSend);
+                    }
+
+                    String time = java.time.LocalTime.now().toString();
+                    String s1 = user + nonceSend + time + epochInitial + epochFinal;
+                    System.out.println("================================= " + s1);
+
+                    //String finalS = "";
+                    //ArrayList<Report> returnReport = new ArrayList<>();
+
+                    try {
+                        Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                        cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get(user));
+                        Iterator i = clientReports.iterator();
+                        while (i.hasNext()) {
+                            Report r = (Report) i.next();
+
+                            String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+                            //r.setEpoch(-1);
+                            //r.setPosX(-1);
+                            //r.setPosY(-1);
+
+                            //byte[] infoBytes = Base64.getDecoder().decode(info);
+                            byte[] cipherBytes1 = cipherReport.doFinal(info.getBytes());
+                            String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                            //r.setEncryptedInfo(loc);
+
+                            //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                            byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
+                            String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+                            //r.setWitness(loc3);
+
+                            byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
+                            String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
+
+                            Report n = new Report(null, -1, -1, -1, loc4, r.getUserSignature(), r.getNonce(), r.getTimeStamp(), loc3, r.getWitnessSignature(), r.getWitnessNonce(), r.getWitnessTimeStamp(), r.getWitnessPos(), id);
+                            n.setEncryptedInfo(loc);
+                            n.setIntPOW(r.getIntPOW());
+
+                            returnReport.add(n);
+
+                            //r.setUsername(loc4);
+                        }
+                        PrivateKey priv = loadPrivKey("server" + id);
+
+                        //Hash message
+                        byte[] messageByte0 = s1.getBytes();
+                        MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                        digest0.update(messageByte0);
+                        byte[] digestByte0 = digest0.digest();
+                        String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+                        //sign the hash with the client's private key
+                        Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                        cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+                        byte[] hashBytes = Base64.getDecoder().decode(digest64);
+                        byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+                        String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+                        finalS = "nonce: " + nonceSend + " | signature: " + signedHash + " | time: " + time;
+                    } catch (NoSuchAlgorithmException e) {
+                        e.printStackTrace();
+                    } catch (InvalidKeyException e) {
+                        e.printStackTrace();
+                    } catch (NoSuchPaddingException e) {
+                        e.printStackTrace();
+                    } catch (BadPaddingException e) {
+                        e.printStackTrace();
+                    } catch (IllegalBlockSizeException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                serverReturn[0] = new ServerReturn(finalS,returnReport,rid);
+                //clientReports.clear();
+            }
+        };
+        worker.start();
+        worker.join();
+        return serverReturn[0];
+    }
+
     //=======================AUTHORITY-METHODS==========================================================================
 
-    public synchronized  ServerReturn obtainLocationReport(String user, String epoch) throws InterruptedException {
+    public synchronized  ServerReturn obtainLocationReport(String user, String epoch, int rid, String signedHashPOW, int hashInt) throws InterruptedException {
 
         int[] ep = {-1};
         ServerReturn[] serverReturn = new ServerReturn[1];
@@ -617,126 +788,131 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 String userFinal="";
                 int epochFinal = -1;
 
-                try {
-                    Cipher cipher = null;
-                    cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipher.init(Cipher.DECRYPT_MODE, symKey.get("ha"));
-
-                    byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
-                    byte[] chunk2 = cipher.doFinal(hashBytes3);
-                    String parse =  new String(chunk2, UTF_8);
-
-                    byte[] hashBytes4 = java.util.Base64.getDecoder().decode(user);
-                    byte[] chunk3 = cipher.doFinal(hashBytes4);
-                    userFinal =  new String(chunk3, UTF_8);
-
-                    ep[0] = Integer.parseInt(parse);
-                    epochFinal = ep[0];
-
-                } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException e) {
-                    e.printStackTrace();
-                }
-
-                filer.appendInformation("\n");
-                filer.appendInformation("[HA USER REQUEST] HA REQUESTING "+userFinal+" LOCATION REPORTS AT EPOCH "+epochFinal+" ===== ");
-
-                ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
-                for(int i = 0; i < clientReports.size();i++){
-                    if(!clientReports.get(i).getUsername().equals(userFinal)){
-                        clientReports.remove(i);
-                        i--;
-                    }else if(clientReports.get(i).getEpoch() != ep[0]){
-                        clientReports.remove(i);
-                        i--;
-                    }
-                }
-                cleanRepetition(clientReports,1);
-                filer.appendInformation("\t\t\tREQUEST SIZE :"+clientReports.size());
-                filer.appendInformation("\t\t\tREQUEST COMPLETE");
-
-                int nonceSend = 1;
-                if(!sendNonce.containsKey(userFinal)){
-                    sendNonce.put(userFinal, nonceSend);
-                }else {
-                    nonceSend = sendNonce.get(userFinal);
-                    nonceSend += 1;
-                    sendNonce.replace(userFinal, nonceSend);
-                }
-
-                String time = java.time.LocalTime.now().toString();
-
-                String s1 = "ha" + userFinal + nonceSend + time + epochFinal;
-
                 String finalS = "";
-
                 ArrayList<Report> returnReport = new ArrayList<>();
 
-                try {
+                if(verifyProofOfWork(signedHashPOW, hashInt, rid).equals("Correct")) {
+                    try {
+                        Cipher cipher = null;
+                        cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                        cipher.init(Cipher.DECRYPT_MODE, symKey.get("ha"));
 
-                    Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("ha"));
+                        byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
+                        byte[] chunk2 = cipher.doFinal(hashBytes3);
+                        String parse = new String(chunk2, UTF_8);
 
-                    Iterator i = clientReports.iterator();
-                    while (i.hasNext()) {
-                        Report r = (Report) i.next();
+                        byte[] hashBytes4 = java.util.Base64.getDecoder().decode(user);
+                        byte[] chunk3 = cipher.doFinal(hashBytes4);
+                        userFinal = new String(chunk3, UTF_8);
 
-                        String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
-                        //r.setEpoch(-1);
-                        //r.setPosX(-1);
-                        //r.setPosY(-1);
+                        ep[0] = Integer.parseInt(parse);
+                        epochFinal = ep[0];
 
-                        byte[] infoBytes = Base64.getDecoder().decode(info);
-                        byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
-                        String loc = Base64.getEncoder().encodeToString(cipherBytes1);
-
-                        //r.setEncryptedInfo(loc);
-
-                        //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
-                        byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
-                        String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
-
-                        //r.setWitness(loc3);
-
-                        byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
-                        String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
-
-                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos(), id);
-                        n.setEncryptedInfo(loc);
-
-                        returnReport.add(n);
-
-                        //r.setUsername(loc4);
+                    } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException e) {
+                        e.printStackTrace();
                     }
-                    PrivateKey priv = loadPrivKey("server" + id);
 
-                    //Hash message
-                    byte[] messageByte0 = s1.getBytes();
-                    MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
-                    digest0.update(messageByte0);
-                    byte[] digestByte0 = digest0.digest();
-                    String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+                    filer.appendInformation("\n");
+                    filer.appendInformation("[HA USER REQUEST] HA REQUESTING " + userFinal + " LOCATION REPORTS AT EPOCH " + epochFinal + " ===== ");
 
-                    //sign the hash with the client's private key
-                    Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    cipherHash.init(Cipher.ENCRYPT_MODE, priv);
-                    byte[] hashBytes = Base64.getDecoder().decode(digest64);
-                    byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
-                    String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+                    ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
+                    for (int i = 0; i < clientReports.size(); i++) {
+                        if (!clientReports.get(i).getUsername().equals(userFinal)) {
+                            clientReports.remove(i);
+                            i--;
+                        } else if (clientReports.get(i).getEpoch() != ep[0]) {
+                            clientReports.remove(i);
+                            i--;
+                        }
+                    }
+                    cleanRepetition(clientReports, 1);
+                    filer.appendInformation("\t\t\tREQUEST SIZE :" + clientReports.size());
+                    filer.appendInformation("\t\t\tREQUEST COMPLETE");
 
-                    finalS = "nonce: " + nonceSend + " | signature: " + signedHash + " | time: " + time;
-                } catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeyException e) {
-                    e.printStackTrace();
-                } catch (NoSuchPaddingException e) {
-                    e.printStackTrace();
-                } catch (BadPaddingException e) {
-                    e.printStackTrace();
-                } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
+                    int nonceSend = 1;
+                    if (!sendNonce.containsKey(userFinal)) {
+                        sendNonce.put(userFinal, nonceSend);
+                    } else {
+                        nonceSend = sendNonce.get(userFinal);
+                        nonceSend += 1;
+                        sendNonce.replace(userFinal, nonceSend);
+                    }
+
+                    String time = java.time.LocalTime.now().toString();
+
+                    String s1 = "ha" + userFinal + nonceSend + time + epochFinal;
+
+                    //String finalS = "";
+                    //ArrayList<Report> returnReport = new ArrayList<>();
+
+                    try {
+
+                        Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                        cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("ha"));
+
+                        Iterator i = clientReports.iterator();
+                        while (i.hasNext()) {
+                            Report r = (Report) i.next();
+
+                            String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+                            //r.setEpoch(-1);
+                            //r.setPosX(-1);
+                            //r.setPosY(-1);
+
+                            byte[] infoBytes = Base64.getDecoder().decode(info);
+                            byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                            String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                            //r.setEncryptedInfo(loc);
+
+                            //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                            byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
+                            String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+                            //r.setWitness(loc3);
+
+                            byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
+                            String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
+
+                            Report n = new Report(null, -1, -1, -1, loc4, r.getUserSignature(), r.getNonce(), r.getTimeStamp(), loc3, r.getWitnessSignature(), r.getWitnessNonce(), r.getWitnessTimeStamp(), r.getWitnessPos(), id);
+                            n.setEncryptedInfo(loc);
+                            n.setIntPOW(r.getIntPOW());
+
+                            returnReport.add(n);
+
+                            //r.setUsername(loc4);
+                        }
+                        PrivateKey priv = loadPrivKey("server" + id);
+
+                        //Hash message
+                        byte[] messageByte0 = s1.getBytes();
+                        MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                        digest0.update(messageByte0);
+                        byte[] digestByte0 = digest0.digest();
+                        String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+                        //sign the hash with the client's private key
+                        Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                        cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+                        byte[] hashBytes = Base64.getDecoder().decode(digest64);
+                        byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+                        String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+                        finalS = "nonce: " + nonceSend + " | signature: " + signedHash + " | time: " + time;
+                    } catch (NoSuchAlgorithmException e) {
+                        e.printStackTrace();
+                    } catch (InvalidKeyException e) {
+                        e.printStackTrace();
+                    } catch (NoSuchPaddingException e) {
+                        e.printStackTrace();
+                    } catch (BadPaddingException e) {
+                        e.printStackTrace();
+                    } catch (IllegalBlockSizeException e) {
+                        e.printStackTrace();
+                    }
                 }
 
-                serverReturn[0] = new ServerReturn(finalS,returnReport);
+                serverReturn[0] = new ServerReturn(finalS,returnReport,rid);
 
 
                 //clientReports.clear();
@@ -747,7 +923,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return serverReturn[0];
     }
 
-    public synchronized  ServerReturn obtainUsersAtLocation(String pos, String epoch) throws InterruptedException{
+    public synchronized  ServerReturn obtainUsersAtLocation(String pos, String epoch, int rid, String signedHashPOW, int hashInt) throws InterruptedException{
 
         int[] ep = {-1};
         int[] posi = {-1, -1};
@@ -761,137 +937,144 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             @Override
             public void run() {
 
-                try {
-                    Cipher cipher = null;
-                    cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-
-                    cipher.init(Cipher.DECRYPT_MODE, symKey.get("ha"));
-
-                    byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
-                    byte[] chunk2 = cipher.doFinal(hashBytes3);
-                    String parse =  new String(chunk2, UTF_8);
-
-                    ep[0] = Integer.parseInt(parse);
-
-                    byte[] hashBytes4 = java.util.Base64.getDecoder().decode(pos);
-                    byte[] chunk3 = cipher.doFinal(hashBytes4);
-                    String position =  new String(chunk3, UTF_8);
-
-                    positionDec[0] = position.split(",")[0];
-                    positionDec[1] = position.split(",")[1];
-
-                    posi[0] = Integer.parseInt(positionDec[0]);
-                    posi[1] = Integer.parseInt(positionDec[1]);
-
-                } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException e) {
-                    e.printStackTrace();
-                }
-
-                filer.appendInformation("\n");
-                filer.appendInformation("[HA LOCATION REQUEST] HA REQUESTING LOCATION REPORTS FOR POSITION ("+ positionDec[0] +","+ positionDec[1] +") AT EPOCH "+ep[0]+" =====");
-
-                ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
-                for(int i = 0; i < clientReports.size();i++){
-                    if(clientReports.get(i).getPosY() != posi[1]){
-                        clientReports.remove(i);
-                        i--;
-                    }else if(clientReports.get(i).getPosX() != posi[0]) {
-                        clientReports.remove(i);
-                        i--;
-                    }else if(clientReports.get(i).getEpoch() != ep[0]){
-                        clientReports.remove(i);
-                        i--;
-                    }
-                }
-                cleanRepetition(clientReports,0);
-                filer.appendInformation("\t\t\tREQUEST SIZE :"+clientReports.size());
-                filer.appendInformation("\t\t\tREQUEST COMPLETE");
-
-
-                int nonceSend = 1;
-                if(!sendNonce.containsKey("ha")){
-                    sendNonce.put("ha", nonceSend);
-                }else {
-                    nonceSend = sendNonce.get("ha");
-                    nonceSend += 1;
-                    sendNonce.replace("ha", nonceSend);
-                }
-
-                String time = java.time.LocalTime.now().toString();
-
-                String s1 = "ha" + posi[0] + posi[1] + nonceSend + time + ep[0];
-
                 String finalS = "";
-
                 ArrayList<Report> returnReport = new ArrayList<>();
 
-                try {
+                if(verifyProofOfWork(signedHashPOW, hashInt, rid).equals("Correct")) {
 
-                    Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
-                    cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("ha"));
+                    try {
+                        Cipher cipher = null;
+                        cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 
-                    Iterator i = clientReports.iterator();
-                    while (i.hasNext()) {
-                        Report r = (Report) i.next();
 
-                        String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
-                        //r.setEpoch(-1);
-                        //r.setPosX(-1);
-                        //r.setPosY(-1);
+                        cipher.init(Cipher.DECRYPT_MODE, symKey.get("ha"));
 
-                        byte[] infoBytes = Base64.getDecoder().decode(info);
-                        byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
-                        String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+                        byte[] hashBytes3 = java.util.Base64.getDecoder().decode(epoch);
+                        byte[] chunk2 = cipher.doFinal(hashBytes3);
+                        String parse = new String(chunk2, UTF_8);
 
-                        //r.setEncryptedInfo(loc);
+                        ep[0] = Integer.parseInt(parse);
 
-                        //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
-                        byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
-                        String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+                        byte[] hashBytes4 = java.util.Base64.getDecoder().decode(pos);
+                        byte[] chunk3 = cipher.doFinal(hashBytes4);
+                        String position = new String(chunk3, UTF_8);
 
-                        //r.setWitness(loc3);
+                        positionDec[0] = position.split(",")[0];
+                        positionDec[1] = position.split(",")[1];
 
-                        byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
-                        String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
+                        posi[0] = Integer.parseInt(positionDec[0]);
+                        posi[1] = Integer.parseInt(positionDec[1]);
 
-                        Report n = new Report(null,-1,-1,-1,loc4,r.getUserSignature(),r.getNonce(), r.getTimeStamp(),loc3,r.getWitnessSignature(),r.getWitnessNonce(), r.getWitnessTimeStamp(),r.getWitnessPos(), id);
-                        n.setEncryptedInfo(loc);
-
-                        returnReport.add(n);
-
-                        //r.setUsername(loc4);
+                    } catch (NoSuchAlgorithmException | NoSuchPaddingException | BadPaddingException | IllegalBlockSizeException | InvalidKeyException e) {
+                        e.printStackTrace();
                     }
 
-                    PrivateKey priv = loadPrivKey("server" + id);
+                    filer.appendInformation("\n");
+                    filer.appendInformation("[HA LOCATION REQUEST] HA REQUESTING LOCATION REPORTS FOR POSITION (" + positionDec[0] + "," + positionDec[1] + ") AT EPOCH " + ep[0] + " =====");
 
-                    //Hash message
-                    byte[] messageByte0 = s1.getBytes();
-                    MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
-                    digest0.update(messageByte0);
-                    byte[] digestByte0 = digest0.digest();
-                    String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+                    ArrayList<Report> clientReports = (ArrayList<Report>) reps.clone();
+                    for (int i = 0; i < clientReports.size(); i++) {
+                        if (clientReports.get(i).getPosY() != posi[1]) {
+                            clientReports.remove(i);
+                            i--;
+                        } else if (clientReports.get(i).getPosX() != posi[0]) {
+                            clientReports.remove(i);
+                            i--;
+                        } else if (clientReports.get(i).getEpoch() != ep[0]) {
+                            clientReports.remove(i);
+                            i--;
+                        }
+                    }
+                    cleanRepetition(clientReports, 0);
+                    filer.appendInformation("\t\t\tREQUEST SIZE :" + clientReports.size());
+                    filer.appendInformation("\t\t\tREQUEST COMPLETE");
 
-                    //sign the hash with the client's private key
-                    Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    cipherHash.init(Cipher.ENCRYPT_MODE, priv);
-                    byte[] hashBytes = Base64.getDecoder().decode(digest64);
-                    byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
-                    String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
-                    finalS = "nonce: " + nonceSend + " | signature: " + signedHash + " | time: " + time;
-                } catch (NoSuchAlgorithmException e) {
-                    e.printStackTrace();
-                } catch (InvalidKeyException e) {
-                    e.printStackTrace();
-                } catch (NoSuchPaddingException e) {
-                    e.printStackTrace();
-                } catch (BadPaddingException e) {
-                    e.printStackTrace();
-                } catch (IllegalBlockSizeException e) {
-                    e.printStackTrace();
+                    int nonceSend = 1;
+                    if (!sendNonce.containsKey("ha")) {
+                        sendNonce.put("ha", nonceSend);
+                    } else {
+                        nonceSend = sendNonce.get("ha");
+                        nonceSend += 1;
+                        sendNonce.replace("ha", nonceSend);
+                    }
+
+                    String time = java.time.LocalTime.now().toString();
+
+                    String s1 = "ha" + posi[0] + posi[1] + nonceSend + time + ep[0];
+
+                    //String finalS = "";
+                    //ArrayList<Report> returnReport = new ArrayList<>();
+
+                    try {
+
+                        Cipher cipherReport = Cipher.getInstance("AES/ECB/PKCS5Padding");
+                        cipherReport.init(Cipher.ENCRYPT_MODE, symKey.get("ha"));
+
+                        Iterator i = clientReports.iterator();
+                        while (i.hasNext()) {
+                            Report r = (Report) i.next();
+
+                            String info = "posXq" + r.getPosX() + "wposYq" + r.getPosY() + "wepochq" + r.getEpoch();
+                            //r.setEpoch(-1);
+                            //r.setPosX(-1);
+                            //r.setPosY(-1);
+
+                            byte[] infoBytes = Base64.getDecoder().decode(info);
+                            byte[] cipherBytes1 = cipherReport.doFinal(infoBytes);
+                            String loc = Base64.getEncoder().encodeToString(cipherBytes1);
+
+                            //r.setEncryptedInfo(loc);
+
+                            //byte[] witnessBytes = Base64.getDecoder().decode(message.getWitness());
+                            byte[] cipherBytes3 = cipherReport.doFinal(r.getWitness().getBytes());
+                            String loc3 = Base64.getEncoder().encodeToString(cipherBytes3);
+
+                            //r.setWitness(loc3);
+
+                            byte[] cipherBytes4 = cipherReport.doFinal(r.getUsername().getBytes());
+                            String loc4 = Base64.getEncoder().encodeToString(cipherBytes4);
+
+                            Report n = new Report(null, -1, -1, -1, loc4, r.getUserSignature(), r.getNonce(), r.getTimeStamp(), loc3, r.getWitnessSignature(), r.getWitnessNonce(), r.getWitnessTimeStamp(), r.getWitnessPos(), id);
+                            n.setEncryptedInfo(loc);
+                            n.setIntPOW(r.getIntPOW());
+
+                            returnReport.add(n);
+
+                            //r.setUsername(loc4);
+                        }
+
+                        PrivateKey priv = loadPrivKey("server" + id);
+
+                        //Hash message
+                        byte[] messageByte0 = s1.getBytes();
+                        MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                        digest0.update(messageByte0);
+                        byte[] digestByte0 = digest0.digest();
+                        String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+
+                        //sign the hash with the client's private key
+                        Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                        cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+                        byte[] hashBytes = Base64.getDecoder().decode(digest64);
+                        byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+                        String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+
+                        finalS = "nonce: " + nonceSend + " | signature: " + signedHash + " | time: " + time;
+                    } catch (NoSuchAlgorithmException e) {
+                        e.printStackTrace();
+                    } catch (InvalidKeyException e) {
+                        e.printStackTrace();
+                    } catch (NoSuchPaddingException e) {
+                        e.printStackTrace();
+                    } catch (BadPaddingException e) {
+                        e.printStackTrace();
+                    } catch (IllegalBlockSizeException e) {
+                        e.printStackTrace();
+                    }
                 }
 
-                serverReturn[0] = new ServerReturn(finalS,returnReport);
+                serverReturn[0] = new ServerReturn(finalS,returnReport,rid);
             }
         };
         worker.start();
@@ -920,6 +1103,10 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             }
         }
         System.out.println("NETWORK SIZE: "+this.replicas.size());
+    }
+
+    public int getId() throws RemoteException{
+        return (int) this.id;
     }
 
     //=======================DATA-FILES-METHODS=========================================================================
@@ -1176,7 +1363,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     }
 
-    private String verifyLocationReport(ClientInterface c,String user, Report locationReport) {
+    private String verifyLocationReport(ClientInterface c,String user, Report locationReport, String signWts, int wts) {
         //witness signature
         try {
 
@@ -1209,12 +1396,23 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             byte[] chunk2 = rsaCipher.doFinal(hashBytes2);
             String userSignature = Base64.getEncoder().encodeToString(chunk2);
 
-            verifyHash = locationReport.getUsername() + locationReport.getNonce() + locationReport.getTimeStamp() + locationReport.getEpoch() + locationReport.getPosX() + locationReport.getPosY();
+            verifyHash = locationReport.getUsername() + locationReport.getNonce() + locationReport.getTimeStamp() + locationReport.getEpoch() + locationReport.getPosX() + locationReport.getPosY() + locationReport.getIntPOW();
             byte[] messageByte2 = verifyHash.getBytes();
             MessageDigest digest2 = MessageDigest.getInstance("SHA-256");
             digest2.update(messageByte2);
             byte[] digestByte2 = digest2.digest();
             String digest64user = Base64.getEncoder().encodeToString(digestByte2);
+
+            byte[] hashBytes3 = java.util.Base64.getDecoder().decode(signWts);
+            byte[] chunk3 = rsaCipher.doFinal(hashBytes3);
+            String wtsS = Base64.getEncoder().encodeToString(chunk3);
+
+            String wtsH = String.valueOf(wts);
+            byte[] messageByte3 = wtsH.getBytes();
+            MessageDigest digest3 = MessageDigest.getInstance("SHA-256");
+            digest3.update(messageByte3);
+            byte[] digestByte3 = digest3.digest();
+            String digest64wts = Base64.getEncoder().encodeToString(digestByte3);
 
             if(!(locationReport.getPosX() >= 0 && locationReport.getPosX() <= GRIDDIMENISION & locationReport.getPosY() >= 0 && locationReport.getPosY() <= GRIDDIMENISION)){
                 System.out.println("Malformed input found! ");
@@ -1223,6 +1421,10 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
             if(!userSignature.equals(digest64user)){
                 return "Error";
+            }
+
+            if(!wtsS.equals(digest64wts)){
+                return "Error Wts";
             }
 
             String username =  locationReport.getUsername();
@@ -1259,6 +1461,112 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             e.printStackTrace();
         }
         return "Correct";
+    }
+
+    private String verifyProofOfWork(Report locationReport) {
+        try {
+            PublicKey pub = loadPublicKey(locationReport.getUsername());
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, pub);
+            byte[] hashBytes1 = java.util.Base64.getDecoder().decode(locationReport.getUserSignature());
+            byte[] chunk = rsaCipher.doFinal(hashBytes1);
+            String userSignature = Base64.getEncoder().encodeToString(chunk);
+
+            //TODO: mudar para minimo 4 zeros
+            if(userSignature.startsWith("0")){
+                return "Correct";
+            }else{
+                return "Error";
+            }
+
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException e) {
+            e.printStackTrace();
+            return "Error";
+        } catch (BadPaddingException | InvalidKeyException e) {
+            System.out.println("Wrong signature");
+            e.printStackTrace();
+            return "Error";
+        }
+    }
+
+    private String verifyProofOfWork(String signHash, String username, int hashInt, int rid) {
+        try {
+            PublicKey pub = loadPublicKey(username);
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, pub);
+            byte[] hashBytes1 = java.util.Base64.getDecoder().decode(signHash);
+            byte[] chunk = rsaCipher.doFinal(hashBytes1);
+            String userSignature = Base64.getEncoder().encodeToString(chunk);
+
+            //TODO: mudar para minimo 4 zeros
+            if(userSignature.startsWith("0")){
+                String s1 = username + rid + hashInt;
+                byte[] messageByte0 = s1.getBytes();
+                MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                digest0.update(messageByte0);
+                byte[] digestByte0 = digest0.digest();
+                String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+                if(digest64.equals(userSignature)){
+                    return "Correct";
+                }
+                return "Error";
+            }else{
+                return "Error";
+            }
+
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | IllegalBlockSizeException e) {
+            e.printStackTrace();
+            return "Error";
+        } catch (BadPaddingException | InvalidKeyException e) {
+            System.out.println("Wrong signature");
+            e.printStackTrace();
+            return "Error";
+        }
+    }
+
+    private String verifyProofOfWork(String signedHashPOW, int hashInt, int rid) {
+
+            //TODO: mudar para minimo 4 zeros
+        try {
+
+            PublicKey pub = loadPublicKey("hauser");
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, pub);
+            byte[] hashBytes1 = java.util.Base64.getDecoder().decode(signedHashPOW);
+            byte[] chunk = rsaCipher.doFinal(hashBytes1);
+            String userSignature = Base64.getEncoder().encodeToString(chunk);
+
+            if(userSignature.startsWith("0")){
+                String s1 = rid + hashInt +"";
+                byte[] messageByte0 = s1.getBytes();
+                MessageDigest digest0 = null;
+                digest0 = MessageDigest.getInstance("SHA-256");
+                digest0.update(messageByte0);
+                byte[] digestByte0 = digest0.digest();
+                String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+                if(digest64.equals(userSignature)){
+                    return "Correct";
+                }
+                return "Error";
+
+            }else{
+                return "Error";
+            }
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchPaddingException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (IllegalBlockSizeException e) {
+            e.printStackTrace();
+        } catch (BadPaddingException e) {
+            e.printStackTrace();
+        }
+        return "Error";
     }
 
     //=======================MAIN=======================================================================================

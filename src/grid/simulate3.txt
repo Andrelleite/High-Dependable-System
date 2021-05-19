@@ -11,9 +11,7 @@ generateproofs,0
 user5,request,0
 spy,report,0,user4,user3
 user2,request,0
-server,down
 ha,position,10,20,0
 ha,user5,0
-server,up
 user5,request,0
 endsim

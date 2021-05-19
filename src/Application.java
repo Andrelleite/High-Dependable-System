@@ -74,13 +74,13 @@ class Simulation{
             if(byz == 0){
                 try {
                     System.out.println("-------- NEW CLIENT "+username+" -------");
-                    Client client = new Client(this.fileNumber,Integer.parseInt(this.N));
+                    Client client = new Client(this.fileNumber,Integer.parseInt(this.N),this.f);
                     String url = "rmi://127.0.0.1:7001/" + username;
                     Naming.rebind(url, client);
-                    client.setUsername(username);
-                    client.setPassword(username);
                     ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + username);
                     client.setClientInterface(h);
+                    client.setUsername(username);
+                    client.setPassword(username);
                     client.loadMoves();
                     this.clients.add(client);
                     System.out.println("new client added : " + username);
@@ -125,14 +125,14 @@ class Simulation{
 
     private void setByzantines(String regex) throws RemoteException, MalformedURLException, NotBoundException {
         String username = regex.split(",")[0];
-        Byzantine bad = new Byzantine(this.fileNumber,Integer.parseInt(this.N));
+        Byzantine bad = new Byzantine(this.fileNumber,Integer.parseInt(this.N),this.f);
         System.out.println("------Setting Byzantine user: "+username+"------");
-        bad.setUsername(username);
-        bad.setPassword(username);
         String url = "rmi://127.0.0.1:7001/" + username;
         Naming.rebind(url, bad);
         ClientInterface h = (ClientInterface) Naming.lookup("rmi://127.0.0.1:7001/" + username);
         bad.setClientInterface(h);
+        bad.setUsername(username);
+        bad.setPassword(username);
         bad.loadMoves();
         System.out.println("new client added : " + username);
         this.byzantines.add(bad);
@@ -218,7 +218,7 @@ class Simulation{
         }
     }
 
-    private void spyOnReports(String epoch, String byz, String victim) throws RemoteException {
+    private void spyOnReports(String epoch, String byz, String victim) throws RemoteException, InterruptedException {
         int flag = 0;
         String original;
         System.out.println("=================================== I'M GONNA WOW YA ====================================");
@@ -251,7 +251,23 @@ class Simulation{
         }
     }
 
-    private void instructionMan(String regex) throws IOException, NotBoundException, ClassNotFoundException {
+    private void sendWitnessReq(String username,String epi,String epf) throws IOException, InterruptedException, ClassNotFoundException {
+        int flag = 0;
+        for(int i = 0; i < this.clients.size() && flag == 0; i++){
+            if(this.clients.get(i).getUsername().equals(username)){
+                this.clients.get(i).getMyWitnessProofs(epi,epf);
+                flag = 1;
+            }
+        }
+        for(int i = 0; i < this.byzantines.size() && flag == 0; i++){
+            if(this.byzantines.get(i).getUsername().equals(username)){
+                this.byzantines.get(i).getMyWitnessProofs(epi,epf);
+                flag = 1;
+            }
+        }
+    }
+
+    private void instructionMan(String regex) throws IOException, NotBoundException, ClassNotFoundException, InterruptedException {
 
         String x,y;
         String user;
@@ -286,6 +302,13 @@ class Simulation{
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+        }else if(request.equals("witness")){
+            System.out.println(origin+" is requesting his witnessed reports.");
+            try {
+                sendWitnessReq(origin,generated[2],generated[3]);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }else if(request.startsWith("user")){
             if(origin.equals("ha")){
                 user = regex.split(",")[1];
@@ -308,7 +331,7 @@ class Simulation{
             startServer(this.N);
             setClientsName();
             this.servers.get(0).setClients(clientsName);
-            this.servers.get(0).setPassword(servername); //TODO: verificar isto
+            this.servers.get(0).setPassword(servername);
             this.servers.get(0).loadSymmetricKeys();
         }*/else if(origin.equals("spy")){
             if(request.equals("report")){
@@ -340,7 +363,7 @@ class Simulation{
                 this.u = setValue(line);
             }else if(lineCounter == 3){
                 this.ha = setValue(line);
-                HAClient ha = new HAClient(Integer.parseInt(this.N));
+                HAClient ha = new HAClient(Integer.parseInt(this.N),this.f);
                 this.authorities.add(ha);
                 this.authorities.get(0).handshake();
             }else if(lineCounter < this.f+3){
@@ -362,6 +385,8 @@ class Simulation{
                             e.printStackTrace();
                         } catch (ClassNotFoundException e) {
                             e.printStackTrace();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
                         }
                     }
                 };
@@ -369,6 +394,7 @@ class Simulation{
                 if(line.split(",")[0].equals("generateproofs")){
                     worker.join();
                 }else{
+                    System.out.println("======================================================= "+line);
                     this.workers.add(worker);
                 }
                 Thread.sleep(1000);
@@ -388,6 +414,20 @@ class Simulation{
 
 public class Application {
 
+    public static void cleanTemporaryFiles(){
+        File tempCr = new File("TempClientReports.txt");
+        File tempSu = new File("TempSystemUsers.txt");
+        if (tempCr.delete()) {
+            System.out.println("Deleted the file: " + tempCr.getName());
+        } else {
+            System.out.println("Failed to delete the file.");
+        }
+        if (tempSu.delete()) {
+            System.out.println("Deleted the file: " + tempSu.getName());
+        } else {
+            System.out.println("Failed to delete the file.");
+        }
+    }
 
     public static void gridGenerator(int u, int number, int maxEpochs, int gridLimit){
 
@@ -458,6 +498,7 @@ public class Application {
         int flag = 0;
         int lineCounter = 0;
 
+        cleanTemporaryFiles();
         PrintWriter writer = new PrintWriter("ClientReports.txt");
         writer.print("");
         writer.close();
@@ -484,7 +525,7 @@ public class Application {
         }
         System.out.println("NUMBER OF USERS: "+numberOfUsers);
         reader.close();
-        gridGenerator(numberOfUsers,filenumber,2,40);
+        //gridGenerator(numberOfUsers,filenumber,2,40);
 
         /* Load epochs and users*/
         try {
