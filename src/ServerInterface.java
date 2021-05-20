@@ -8,6 +8,7 @@ import java.io.*;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Final Version
@@ -26,4 +27,5 @@ public interface ServerInterface extends Remote, Serializable {
     public ServerReturn requestMyProofs(ClientInterface c,String user, String ei, String ef, int rid, String signedHash, int hashInt) throws RemoteException, InterruptedException;
     public void HASubscribe(String key, String user) throws RemoteException;
     public int getId() throws RemoteException;
+    public ConcurrentHashMap getRPsU() throws RemoteException;
 }
