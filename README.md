@@ -119,12 +119,13 @@ There will be five simulations files, all of them with their according grid file
 
 These have intrisic objectives:
 
-1. **Simulation1.txt** : This simulation is the simplest one as it only performs the proof generation for all of the epochs. The output for this file should focus the Server and the Clients. For this reason, files **Server.txt** and **User[x].txt** are created at /output. In the server should be the requests for each client and the proof with all its segments. In the client it should be presented the requests made for the proof generation, but no reports of the proof sent to the server (since it only appears when a user requests it to the server).
-2. **Simulation2.txt** : In this simulation, are expected some requests of reports made for some clients, and so, it's important to verifiy that their reports show on the according files. Also, some byzantine behaviour is set, and for that, files of this kind of users should be very similar with the clients, however, with the difference that no request is correct or accepted, showing errors and server denials.
-3. **Simulation3.txt** : In this particular simulation, despite being made the same operations as before, it's added the Healthcare Authority. The HA will make two types of request, one for a specific location at an epoch, and another for a user at an epoch. But, all this will happen when the server has crashed. So, it's interesting to check the behaviour of the HA when this drop happens and how he handles it and still gets the requests made to the server. Futhermore, in the **HA.txt** should also be displayed both requests and its answers.
-4. **Simulation4.txt** : This simulation is a more acute version of simulation3.txt, and for that reason all files regarding to the users operations should present changes regarding to the responses of those said operations, as well as both the server and HA files.
-5. **Simulation5.txt** : This simulation takes us to the pinacle of protection in the system. In this particular set of operations, there will only be performed Byzantine behaviours. In Server.txt should be present the requests made and their denials. In the users' files, there will be no concrete data, only information regarding when the request was made and which one, since according to our protection settings, these clients can not request the data of another user, so all the requests will be denied by the server.
- 
+1. **Simulation1.txt** : Validation of multiple Health Care Authorities request to the network. Multiple files should be created to state the replies from the servers.
+2. **Simulation2.txt** : Simple users requests to the network. Interesting to test the Atomicity of the registers.
+3. **Simulation3.txt** : Introduction to byzantine behaviour on the client side of the application.
+4. **Simulation4.txt** : Close to reality simulation, with byzantine behaviour as well as server crash during runtime.
+5. **Simulation5.txt** : Fully Byzantine simulation.
+6. **Simulation6.txt** : Clean report generation in all epochs. 
+7. **Simulation7.txt** : Clients request to their witnessed reports, with some HA activity. *NEW METHOD*
   
 
 Thank you for your time and attention. That's enough for this to go smoothly.
