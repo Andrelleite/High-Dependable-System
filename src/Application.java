@@ -4,12 +4,7 @@ import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.rmi.server.ExportException;
-import java.time.LocalDateTime;
 import java.util.*;
-
-import static java.rmi.Naming.*;
 
 class Simulation{
 
@@ -40,8 +35,8 @@ class Simulation{
 
     private void startServer(String cardinal) throws NotBoundException, IOException, ClassNotFoundException {
 
-        N = cardinal.strip().split(",")[1];
-        int n = Integer.parseInt(cardinal.strip().split(",")[1]);
+        int n = (2*this.f) + 1;
+        this.N = String.valueOf(n);
         LocateRegistry.createRegistry(7000);
 
         for(int i = 0; i < n; i++){
@@ -50,14 +45,39 @@ class Simulation{
                 this.servers.add(new Server(this.f,this.fline,(i+1),n));
                 this.servers.get(i).setPassword("server" + (i+1));
             }  catch (NotBoundException | IOException | ClassNotFoundException e) {
-                System.out.println("SHIT.");
+                System.out.println("sit.");
             }
         }
 
         for(int i = 0; i < n; i++){
             this.servers.get(i).connectToNetwork(this.servers.get(i).getInterface());
         }
-        
+
+    }
+
+    private void serverUp(int i) throws NotBoundException, IOException, ClassNotFoundException {
+
+        int n = (2*this.f) + 1;
+        try {
+            System.out.println("Starting server replica number "+(i+1));
+            this.servers.add(new Server(this.f,this.fline,(i+1),n));
+            this.servers.get(i).setPassword("server" + (i+1));
+        }  catch (NotBoundException | IOException | ClassNotFoundException e) {
+            System.out.println("sit.");
+        }
+
+        this.servers.get(i).connectToNetwork(this.servers.get(i).getInterface());
+
+    }
+
+    private void startAuthorities() throws NotBoundException, IOException, ClassNotFoundException {
+
+        String username;
+        for(int i = 0; i < this.ha; i++) {
+            HAClient ha = new HAClient(Integer.parseInt(this.N),this.f,(i+1));
+            this.authorities.add(ha);
+            this.authorities.get(i).handshake();
+        }
     }
 
     private void startClients(){
@@ -112,9 +132,7 @@ class Simulation{
         }
 
         clientsNames.add("ha");
-
         clientsName = clientsNames;
-
     }
 
     private int setValue(String regex){
@@ -309,31 +327,32 @@ class Simulation{
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-        }else if(request.startsWith("user")){
+        }else if(generated[2].startsWith("user")){
             if(origin.equals("ha")){
-                user = regex.split(",")[1];
-                this.authorities.get(0).communicate(this.authorities.get(0).getServerInterface(),2,user,"0","0",generated[2]);
+                user = regex.split(",")[2];
+                System.out.println("**AUTHORITY "+request+" REQUESTING**");
+                this.authorities.get(Integer.parseInt(request)-1).communicate(this.authorities.get(Integer.parseInt(request)-1).getServerInterface(),2,user,"0","0",generated[3]);
                 System.out.println("HA is requesting "+user+" location.");
             }
-        }else if(request.equals("position")){
-            x = generated[2];
-            y = generated[3];
-            epoch = regex.split(",")[4];
+        }else if(generated[2].equals("position")){
+            x = generated[3];
+            y = generated[4];
+            epoch = regex.split(",")[5];
             if(origin.equals("ha")){
-                System.out.println("HA is requesting users history at this location: ("+x+","+y+") at epoch "+ epoch);
-                this.authorities.get(0).communicate(this.authorities.get(0).getServerInterface(),1,"",x,y,epoch);
+                System.out.println("HA"+request+" is requesting users history at this location: ("+x+","+y+") at epoch "+ epoch);
+                this.authorities.get(Integer.parseInt(request)-1).communicate(this.authorities.get(Integer.parseInt(request)-1).getServerInterface(),1,"",x,y,epoch);
             }
-        }/*else if(request.equals("down")){
+        }else if(request.equals("down")){
             System.out.println("Simulate Server Crash or Connection drop.");
-            this.servers.get(0).shutdown();
+            this.servers.get(Integer.parseInt(generated[2])-1).shutdown();
         }else if(request.equals("up")){
             System.out.println("Turn on Server.");
-            startServer(this.N);
-            setClientsName();
-            this.servers.get(0).setClients(clientsName);
-            this.servers.get(0).setPassword(servername);
-            this.servers.get(0).loadSymmetricKeys();
-        }*/else if(origin.equals("spy")){
+            serverUp(Integer.parseInt(generated[2])-1);
+            //setClientsName();
+            this.servers.get(Integer.parseInt(generated[2])-1).setClients(clientsName);
+            this.servers.get(Integer.parseInt(generated[2])-1).setPassword("server"+(Integer.parseInt(generated[2])));
+            this.servers.get(Integer.parseInt(generated[2])-1).loadSymmetricKeys();
+        }else if(origin.equals("spy")){
             if(request.equals("report")){
                 spyOnReports(generated[2],generated[3],generated[4]);
             }
@@ -353,19 +372,16 @@ class Simulation{
             String line = reader.nextLine();
 
             if(lineCounter == 0){
-                startServer(line);
-                System.out.println("======================ALL SERVERS ARE ONLINE======================");
-            }else if(lineCounter == 1){
                 this.f = setValue(line);
                 this.fline = Integer.parseInt(line.split(",")[2]);
                 System.out.println("F: "+this.f+" F': "+this.fline);
-            }else if(lineCounter == 2){
+                startServer(line);
+                System.out.println("======================ALL SERVERS ARE ONLINE======================");
+            }else if(lineCounter == 1){
                 this.u = setValue(line);
-            }else if(lineCounter == 3){
+            }else if(lineCounter == 2){
                 this.ha = setValue(line);
-                HAClient ha = new HAClient(Integer.parseInt(this.N),this.f, 1);//TODO: HARDCODED -> ADICIONEI UM 1
-                this.authorities.add(ha);
-                this.authorities.get(0).handshake();
+                startAuthorities();
             }else if(lineCounter < this.f+3){
                 setByzantines(line);
             }else if(line.equals("endsim")){
@@ -409,8 +425,6 @@ class Simulation{
     }
 
 }
-
-
 
 public class Application {
 
