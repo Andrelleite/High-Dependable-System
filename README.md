@@ -107,6 +107,7 @@ NUMBER OF SIMULATION: 1
 NUMBER OF USERS: 5
 ====================== SIMULATION HAS STARTED ======================
 F: 2 F': 1
+REPLICAS: 7
 ```
 
 ***NOTE: DO NOT FIDDLE WITH ClientReports.txt and SystemUsers***
