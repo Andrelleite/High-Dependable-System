@@ -1,6 +1,9 @@
+import org.w3c.dom.ls.LSResourceResolver;
+
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
+import java.lang.ref.Cleaner;
 import java.net.MalformedURLException;
 import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
@@ -9,8 +12,6 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.time.LocalTime;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,7 +26,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
     public ConcurrentHashMap<String,Integer> sendNonce = new ConcurrentHashMap<String, Integer>();
     public ConcurrentHashMap<String,Integer> receiveNonce = new ConcurrentHashMap<String, Integer>();
     public ConcurrentHashMap<ClientInterface,Integer> writerTimestamps;
-    public ConcurrentHashMap<ClientInterface,Integer> requestLoadBalancer;
+    public ConcurrentHashMap<String,ClientInterface> requestPerUser;
     private ArrayList<Report> reps; // Structure of all reports in the system
     private ArrayList<ServerInterface> replicas;
     private ServerInterface server;
@@ -60,7 +61,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         this.portRMI = 7000;
         this.symKey = new ConcurrentHashMap<>();
         this.writerTimestamps = new ConcurrentHashMap<>();
-        this.requestLoadBalancer = new ConcurrentHashMap<>();
+        this.requestPerUser = new ConcurrentHashMap<>();
         this.replicas = new ArrayList<>();
         this.fileMan = new OutputManager("Server"+this.id,"Server"+this.id);
         this.fileMan.initFile();
@@ -194,7 +195,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
             this.symKey.put(user,originalKey);
             this.writerTimestamps.put(c,0);
-            this.requestLoadBalancer.put(c,0);
             StoreKeysToKeyStore(originalKey, user,"KeyStore","src/keys/aes-" + user +".keystore");
 
             //this.setSymKey(originalKey);
@@ -375,6 +375,9 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                     if(verifyRet.equals("Correct") && wts > userTimestamp[0] && !checkClone(locationReport)){ // ts' > ts
 
                         userTimestamp[0]=wts;
+                        int pass = 0;
+                        String key = user+""+locationReport.getEpoch()+""+wts;
+                        requestPerUser.put(key,c);
 
                         filer.appendInformation("\t\t\tRECEIVED A NEW PROOF OF LOCATION FROM - "+ locationReport.getUsername());
                         filer.appendInformation("\t\t\tUSER SIGNATURE: " + locationReport.getUserSignature());
@@ -387,43 +390,54 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                         filer.appendInformation("\t\t\tWITNESS TIMESTAMP: " + locationReport.getWitnessTimeStamp());
                         filer.appendInformation("\t\t\tWITNESS POS: (" + locationReport.getPosXWitness() + "," + locationReport.getPosYWitness() + ") ");
 
-                        reps.add(locationReport);
                         try {
-
-                            updateReports();
-
-                            int nonceSend = 1;
-                            if(!sendNonce.containsKey(user)){
-                                sendNonce.put(user, nonceSend);
-                            }else {
-                                nonceSend = sendNonce.get(user);
-                                nonceSend += 1;
-                                sendNonce.replace(user, nonceSend);
+                            if(coherenceChecker(key)){
+                                reps.add(locationReport);
+                            }else{
+                                pass = 1;
                             }
+                        } catch (RemoteException e) {
+                            System.out.println("Connection lost.");
+                        }
 
-                            String time = java.time.LocalTime.now().toString();
+                        try {
+                            if(pass == 0){
+                                updateReports();
+                                int nonceSend = 1;
+                                if(!sendNonce.containsKey(user)){
+                                    sendNonce.put(user, nonceSend);
+                                }else {
+                                    nonceSend = sendNonce.get(user);
+                                    nonceSend += 1;
+                                    sendNonce.replace(user, nonceSend);
+                                }
 
-                            String s1 = user + nonceSend + time + locationReport.getEpoch();
-                            PrivateKey priv = loadPrivKey("server" + id);
+                                String time = java.time.LocalTime.now().toString();
 
-                            //Hash message
-                            byte[] messageByte0 = s1.getBytes();
-                            MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
-                            digest0.update(messageByte0);
-                            byte[] digestByte0 = digest0.digest();
-                            String digest64 = Base64.getEncoder().encodeToString(digestByte0);
+                                String s1 = user + nonceSend + time + locationReport.getEpoch();
+                                PrivateKey priv = loadPrivKey("server" + id);
 
-                            //sign the hash with the server's private key
-                            Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                            cipherHash.init(Cipher.ENCRYPT_MODE, priv);
-                            byte[] hashBytes = Base64.getDecoder().decode(digest64);
-                            byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
-                            String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
+                                //Hash message
+                                byte[] messageByte0 = s1.getBytes();
+                                MessageDigest digest0 = MessageDigest.getInstance("SHA-256");
+                                digest0.update(messageByte0);
+                                byte[] digestByte0 = digest0.digest();
+                                String digest64 = Base64.getEncoder().encodeToString(digestByte0);
 
-                            serverReturn[0] = "nonce: " + nonceSend + " | signature: " + signedHash + " | time: " + time;
-                            filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
-                            filer.appendInformation("\t\t SIGNATURE: " + signedHash);
+                                //sign the hash with the server's private key
+                                Cipher cipherHash = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                                cipherHash.init(Cipher.ENCRYPT_MODE, priv);
+                                byte[] hashBytes = Base64.getDecoder().decode(digest64);
+                                byte[] finalHashBytes = cipherHash.doFinal(hashBytes);
+                                String signedHash = Base64.getEncoder().encodeToString(finalHashBytes);
 
+                                serverReturn[0] = "nonce: " + nonceSend + " | signature: " + signedHash + " | time: " + time;
+                                filer.appendInformation("\t\t REQUEST FOR LOCATION PROOF COMPLETE AT: " + time);
+                                filer.appendInformation("\t\t SIGNATURE: " + signedHash);
+                            }else{
+                                filer.appendInformation("\t\t\tREQUEST FOR LOCATION PROOF DENIED.");
+                                serverReturn[0] = null;
+                            }
 
                         } catch (IOException | NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException e) {
                             filer.appendInformation("\t\t !REQUEST FOR LOCATION PROOF DROPPED! CODE#SSLR6");
@@ -456,7 +470,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         ArrayList<Report> reps = this.reps;
         ConcurrentHashMap<String,SecretKey> symKey = this.symKey;
         OutputManager filer = this.fileMan;
-        this.requestLoadBalancer.put(c,this.requestLoadBalancer.get(c)+1);
 
         Thread worker = new Thread("Worker") {
             @Override
@@ -608,11 +621,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
             }
         };
-        //this.requestLoadBalancer.put(c,this.requestLoadBalancer.get(c)-1);
-        filer.appendInformation("\n\t\t\tLOAD DISTRIBUTION: ");
-        for (ClientInterface cl: this.requestLoadBalancer.keySet()){
-            filer.appendInformation("\t\t\t"+cl.getUsername()+" requests on progress: "+this.requestLoadBalancer.get(cl));
-        }
         filer.appendInformation("\n");
         worker.start();
         worker.join();
@@ -1108,6 +1116,22 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         return (int) this.id;
     }
 
+    public boolean coherenceChecker(String key) throws RemoteException {
+
+        int checks = 0;
+        for(int i = 0; i < this.replicas.size(); i++){
+            if(this.replicas.get(i).getRPsU().containsKey(key)){
+                checks++;
+            }
+        }
+        if(checks > this.network/2){
+            this.fileMan.appendInformation("** SERVER "+this.id+" CHECKS OUT WITH "+checks+" **");
+            System.out.println("** SERVER "+this.id+" CHECKS OUT WITH "+checks+" **");
+            return true;
+        }
+        return false;
+    }
+
     //=======================DATA-FILES-METHODS=========================================================================
 
     private boolean checkClone(Report report){
@@ -1157,7 +1181,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     }
 
-    private void synchronize() throws IOException, ClassNotFoundException {
+    private synchronized void synchronize() throws IOException, ClassNotFoundException {
 
         ObjectInputStream ois, oist;
         ArrayList<Report> tempRepsU, repsU;
@@ -1567,6 +1591,8 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
         }
         return "Error";
     }
+
+    public ConcurrentHashMap getRPsU() throws RemoteException { return this.requestPerUser; }
 
     //=======================MAIN=======================================================================================
 
