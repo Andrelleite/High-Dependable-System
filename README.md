@@ -125,7 +125,7 @@ These have intrisic objectives:
 4. **Simulation4.txt** : Close to reality simulation, with byzantine behaviour as well as server crash during runtime.
 5. **Simulation5.txt** : Fully Byzantine simulation.
 6. **Simulation6.txt** : Clean report generation in all epochs. 
-7. **Simulation7.txt** : Clients request to their witnessed reports, with some HA activity. *NEW METHOD*
+7. **Simulation7.txt** : Clients request to their witnessed reports, with some HA activity. **NEW METHOD**
   
 
 Thank you for your time and attention. That's enough for this to go smoothly.
