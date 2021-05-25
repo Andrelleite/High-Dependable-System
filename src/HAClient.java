@@ -44,7 +44,7 @@ public class HAClient extends Thread{
 
     public HAClient(int servers, int f, int id) throws IOException, NotBoundException, ClassNotFoundException, NotBoundException, IOException, ClassNotFoundException{
         super();
-        this.fileMan = new OutputManager("HA","Health Authority");
+        this.fileMan = new OutputManager("HA"+id,"Health Authority");
         this.networkTosymKey = new HashMap<>();
         this.fileMan.initFile();
         this.F = f;
@@ -156,7 +156,6 @@ public class HAClient extends Thread{
                         hashPOW = Base64.getEncoder().encodeToString(digestByte0);
                     }
                     while(!hashPOW.startsWith("0"));
-                    //TODO: mudar para min 4 zeros
 
                     PrivateKey priv = loadPrivKey(this.userid);
 
@@ -281,7 +280,6 @@ public class HAClient extends Thread{
                         hashPOW = Base64.getEncoder().encodeToString(digestByte0);
                     }
                     while(!hashPOW.startsWith("0"));
-                    //TODO: mudar para min 4 zeros
 
                     PrivateKey priv = loadPrivKey(this.userid);
 
@@ -529,7 +527,7 @@ public class HAClient extends Thread{
     //====================================MAIN==========================================================================
 
     public static void main(String[] args) throws NotBoundException, IOException, ClassNotFoundException {
-        HAClient ha = new HAClient(6,2, 1); //TODO: HARDCODED -> ADICIONEI UM 1
+        HAClient ha = new HAClient(6,2, 1);
         //ha.handshake(1,"","30","37","0");
         //ha.handshake(1,"","30","37","0");
     }

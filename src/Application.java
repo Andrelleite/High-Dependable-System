@@ -35,7 +35,8 @@ class Simulation{
 
     private void startServer(String cardinal) throws NotBoundException, IOException, ClassNotFoundException {
 
-        int n = (2*this.f) + 1;
+        int n = (3*this.f) + 1;
+        System.out.println("REPLICAS: "+n);
         this.N = String.valueOf(n);
         LocateRegistry.createRegistry(7000);
 

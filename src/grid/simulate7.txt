@@ -1,9 +1,9 @@
-s,6
-f,2,1
+f,3,1
 u,5
 ha,1
 user2,b
 user4,b
+user5,b
 setupclients
 generateproofs,0
 user1,request,0

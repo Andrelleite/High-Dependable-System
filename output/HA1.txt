@@ -1,0 +1,5 @@
+=================== Health Authority Output File ===================
+23:57:27 -> 
+
+23:57:27 -> [REQUEST TO SERVER] USERS AT: 10,20 IN EPOCH 0 $$$
+23:57:29 -> 		SERVER RETURN: nonce: 1 | signature: iA96C+a1/OhLujKNCoBmIav3X6v8iGPUvoGrVEJaPn+tJ/ojBuWTlhetzKqcXg9gJxf3pU3p7QhriShxwil8vk8vCCQ6x8zpVZ60tXd14k6+lGZU4Lr7ap+Ncds7YPuuXpHwi+Fs78K01MBL+W45QJ91slmT1EWv1ZiJ6wgiIuOr8EDrGpqeMWGs6U4AsJ7L8zhzoxijH0XHbzl0w1Nsnn4mF82f8N5HtNrmAIjBLEs1NOXRhLXoT8OOllK47DfSLN9UfITn07CMquADfJtt5r9jNwGayTLfmt0dBHwIB1axmcb4hOE5IDUiXiQOQoJ+wES+A+IeMxriakkh5SE90g== | time: 23:57:29.612506

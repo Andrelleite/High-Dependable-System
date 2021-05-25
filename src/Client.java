@@ -707,7 +707,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             digest64 = Base64.getEncoder().encodeToString(digestByte0);
                         }
                         while(!digest64.startsWith("0"));
-                        //TODO: mudar para minimo 4 zeros
                         //System.out.println("HASH: " + digest64);
 
                         String s2 = String.valueOf(this.writerTimeStamp.get());
@@ -958,7 +957,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                     digest64 = Base64.getEncoder().encodeToString(digestByte0);
                 }
                 while(!digest64.startsWith("0"));
-                //TODO: mudar para minimo 4 zeros
                 String s2 = String.valueOf(this.writerTimeStamp.get());
                 PrivateKey priv = loadPrivKey(this.getUsername());
 
@@ -1096,17 +1094,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
         Thread worker = new Thread("Worker"){
             @Override
             public void run(){
-                try {
-                    if(tempC.getUsername().equals("user2")){
-                        try {
-                            Thread.sleep(20000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                } catch (RemoteException e) {
-                    e.printStackTrace();
-                }
                 HashMap<ServerInterface,ServerReturn> readList = new HashMap<>();
                 ServerInterface sr = null;
                 ArrayList<Report> reports = new ArrayList<>();
@@ -1144,7 +1131,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             digest64 = Base64.getEncoder().encodeToString(digestByte0);
                         }
                         while(!digest64.startsWith("0"));
-                        //TODO: mudar para min 4 zeros
                         PrivateKey priv = loadPrivKey(tempC.getUsername());
 
                         //sign the hash with the client's private key
@@ -1335,7 +1321,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface, Runn
                             digest64 = Base64.getEncoder().encodeToString(digestByte0);
                         }
                         while(!digest64.startsWith("0"));
-                        //TODO: mudar para min 4 zeros
                         PrivateKey priv = loadPrivKey(tempC.getUsername());
 
                         //sign the hash with the client's private key

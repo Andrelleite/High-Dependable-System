@@ -1124,7 +1124,7 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
                 checks++;
             }
         }
-        if(checks > this.network/2){
+        if(checks > this.network/3){
             this.fileMan.appendInformation("** SERVER "+this.id+" CHECKS OUT WITH "+checks+" **");
             System.out.println("** SERVER "+this.id+" CHECKS OUT WITH "+checks+" **");
             return true;
@@ -1496,7 +1496,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             byte[] chunk = rsaCipher.doFinal(hashBytes1);
             String userSignature = Base64.getEncoder().encodeToString(chunk);
 
-            //TODO: mudar para minimo 4 zeros
             if(userSignature.startsWith("0")){
                 return "Correct";
             }else{
@@ -1523,7 +1522,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
             byte[] chunk = rsaCipher.doFinal(hashBytes1);
             String userSignature = Base64.getEncoder().encodeToString(chunk);
 
-            //TODO: mudar para minimo 4 zeros
             if(userSignature.startsWith("0")){
                 String s1 = username + rid + hashInt;
                 byte[] messageByte0 = s1.getBytes();
@@ -1551,7 +1549,6 @@ public class Server extends UnicastRemoteObject implements ServerInterface, Seri
 
     private String verifyProofOfWork(String signedHashPOW, int hashInt, int rid, String userId) {
 
-            //TODO: mudar para minimo 4 zeros
         try {
 
             PublicKey pub = loadPublicKey(userId);
