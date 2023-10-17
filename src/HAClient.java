@@ -21,7 +21,6 @@ public class HAClient extends Thread{
     private int F;
     private IdentityHashMap<Integer,Integer> identity;
     private SecretKey symKey;
-    private secret = "9dbd485c0ba1f336a0efab4ebd05d9f39cc46686";
     private OutputManager fileMan;
     private int servers;
 
